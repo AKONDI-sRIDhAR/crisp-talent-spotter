@@ -79,30 +79,29 @@ const InterviewChat: React.FC = () => {
   }, [currentCandidate]);
 
   const generateNextQuestion = async () => {
-    if (!currentCandidate) return;
+    // Get the LATEST state directly from the store to prevent stale closures
+    const latestCandidate = useInterviewStore.getState().currentCandidate;
 
-    const questionIndex = currentCandidate.currentQuestionIndex;
-    if (questionIndex >= 6) {
-      await finishInterviewProcess();
-      return;
-    }
+    if (!latestCandidate) return;
+
+    // The check for interview completion is now in handleSubmitAnswer
 
     setIsLoading(true);
 
     try {
       const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
-      const difficulty = difficulties[questionIndex];
+      const difficulty = difficulties[latestCandidate.currentQuestionIndex];
       
-      const previousQuestions = currentCandidate.answers.map(a => a.question);
+      const previousQuestions = latestCandidate.answers.map(a => a.question);
       const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
       
       setCurrentQuestion(questionData);
       setTimeRemaining(questionData.timeLimit);
       
       const questionMessage: Message = {
-        id: `question-${questionIndex}`,
+        id: `question-${latestCandidate.currentQuestionIndex}`,
         type: 'ai',
-        content: `**Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)**\n\n${questionData.question}`,
+        content: `Question ${latestCandidate.currentQuestionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
         timestamp: new Date(),
         isQuestion: true,
         options: questionData.options
@@ -145,6 +144,13 @@ const InterviewChat: React.FC = () => {
     // Submit answer to store (no scoring here)
     submitAnswer(selectedOption, timeUsed);
     
+    // Check if the interview is over
+    const latestCandidate = useInterviewStore.getState().currentCandidate;
+    if (latestCandidate && latestCandidate.answers.length >= 6) {
+      await finishInterviewProcess();
+      return;
+    }
+
     // Add transition message
     const transitionMessage: Message = {
       id: `transition-${Date.now()}`,
@@ -171,63 +177,73 @@ const InterviewChat: React.FC = () => {
   };
 
   const finishInterviewProcess = async () => {
-    if (!currentCandidate) return;
+    const latestCandidate = useInterviewStore.getState().currentCandidate;
+    if (!latestCandidate) return;
 
     setIsLoading(true);
+
+    const scoreWeights = {
+      easy: 0.5,
+      medium: 2,
+      hard: 5,
+    };
 
     try {
       // Score all answers at the end
       const scoredAnswers = [];
-      let totalScore = 0;
+      let finalTotalScore = 0;
 
-      for (const answer of currentCandidate.answers) {
+      for (const answer of latestCandidate.answers) {
         const { score, comment } = await aiService.scoreAnswer(
           answer.question,
           answer.answer,
           answer.difficulty
         );
         
+        const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
+
         const scoredAnswer = {
           ...answer,
-          aiScore: score,
-          aiComment: comment
+          aiScore: score, // Keep original 0-10 score for AI feedback
+          aiComment: comment,
         };
         
         scoredAnswers.push(scoredAnswer);
-        totalScore += score;
+        finalTotalScore += weightedScore;
       }
-
-      const averageScore = scoredAnswers.length > 0 ? totalScore / scoredAnswers.length : 0;
 
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
-        currentCandidate.name
+        latestCandidate.name
       );
 
-      updateCandidate(currentCandidate.id, {
+      const finalCandidate: Candidate = {
+        ...latestCandidate,
         answers: scoredAnswers,
-        score: Math.round(averageScore * 10) / 10,
+        score: finalTotalScore,
         aiSummary: summary,
         status: 'completed',
         endTime: new Date()
-      });
+      };
 
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        content: `🎉 **Interview Complete!**\n\n**Final Score: ${Math.round(averageScore * 10) / 10}/10**\n\n${summary}\n\nThank you for taking the interview, ${currentCandidate.name}!`,
+        content: `🎉 Interview Complete!\n\nFinal Score: ${finalTotalScore.toFixed(1)}/15\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, finalMessage]);
       
       setTimeout(() => {
-        finishInterview();
+        finishInterview(finalCandidate);
       }, 5000);
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      finishInterview();
+      // Even on error, we should try to finish the interview with available data
+      const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
+      finishInterview(candidateOnError);
     } finally {
       setIsLoading(false);
     }
