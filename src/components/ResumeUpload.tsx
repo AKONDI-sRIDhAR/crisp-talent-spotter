@@ -11,12 +11,13 @@ import { useInterviewStore } from '@/store/interviewStore';
 import { aiService } from '@/services/aiService';
 
 interface ResumeUploadProps {
-  onComplete: () => void;
+  onComplete: (data: { name: string; email: string; phone: string; resumeText: string }) => void;
 }
 
 const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'error' | 'success'>('idle');
   const [error, setError] = useState<string>('');
+  const [resumeText, setResumeText] = useState<string>('');
   const [extractedData, setExtractedDataLocal] = useState<{ name?: string; email?: string; phone?: string }>({});
   const [manualData, setManualData] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
   
@@ -73,7 +74,9 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
         phone: extracted.phone || ''
       });
 
+      setResumeText(simulatedText); // Store the resume text in state
       setUploadStatus('success');
+
     } catch (err) {
       console.error('Error processing resume:', err);
       setError('Failed to process resume. Please try again.');
@@ -101,7 +104,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
 
     // Update store with final data
     setStoreExtractedData(manualData);
-    onComplete();
+    onComplete({ ...manualData, resumeText });
   };
 
   return (
