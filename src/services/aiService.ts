@@ -1,16 +1,20 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
+import { getStaticQuestion } from '../lib/staticQuestions'; // Assumed dependency for the fallback logic
+
+// NOTE: Hardcoded API key is removed.
 
 export class AIService {
+  
+  // Method to instantiate the model for a specific API key
   private getModel(apiKey: string) {
-    if (!apiKey) {
-      throw new Error('API key is required for AI services.');
-    }
     const genAI = new GoogleGenerativeAI(apiKey);
     return genAI.getGenerativeModel({ model: 'gemini-pro' });
   }
 
   async extractResumeData(resumeText: string, apiKey: string) {
+    if (!apiKey) return { name: null, email: null, phone: null };
+
     const prompt = `
       Extract the following information from this resume text. Return ONLY a JSON object with these exact keys:
       - name: candidate's full name
@@ -29,7 +33,6 @@ export class AIService {
       const response = await result.response;
       const text = response.text();
       
-      // Clean the response to extract JSON
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
@@ -45,8 +48,13 @@ export class AIService {
   async generateQuestion(
     difficulty: 'easy' | 'medium' | 'hard',
     previousQuestions: string[],
-    apiKey: string
+    apiKey: string | null | undefined
   ): Promise<InterviewQuestion> {
+    // If no API key is provided, or if it's an empty string, fall back to static questions.
+    if (!apiKey) {
+      return getStaticQuestion(difficulty, previousQuestions);
+    }
+
     const timeMap = {
       easy: 20,
       medium: 60,
@@ -94,13 +102,12 @@ export class AIService {
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         
-        // Clean up markdown from the question
         const cleanQuestion = parsed.question.replace(/\*\*/g, '');
 
         return {
           id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           question: cleanQuestion,
-          difficulty, // Use the provided difficulty
+          difficulty,
           timeLimit: timeMap[difficulty],
           options: parsed.options
         };
@@ -108,20 +115,17 @@ export class AIService {
       
       throw new Error('Invalid or incomplete response format from AI');
     } catch (error) {
-      console.error('Error generating question:', error);
-      
-      // Return a hardcoded fallback question matching the requested difficulty
-      const fallbackQuestions: Record<'easy' | 'medium' | 'hard', InterviewQuestion> = {
-        easy: { id: 'fb_e', difficulty: 'easy', question: 'What does `useState` return in React?', options: ['A) A value and a function', 'B) An object', 'C) An array', 'D) A string'], timeLimit: timeMap.easy },
-        medium: { id: 'fb_m', difficulty: 'medium', question: 'What is middleware in the context of Express.js?', options: ['A) A database driver', 'B) A templating engine', 'C) A function with access to req and res objects', 'D) A client-side library'], timeLimit: timeMap.medium },
-        hard: { id: 'fb_h', difficulty: 'hard', question: 'How would you optimize a React app that is rendering slowly?', options: ['A) Using `React.memo`', 'B) Code splitting', 'C) Virtualizing long lists', 'D) All of the above'], timeLimit: timeMap.hard },
-      };
-      
-      return fallbackQuestions[difficulty];
+      console.error('Error generating dynamic question, falling back to static:', error);
+      // If the AI call fails (e.g. invalid key), also fall back to static.
+      return getStaticQuestion(difficulty, previousQuestions);
     }
   }
 
   async scoreAnswer(question: string, answer: string, difficulty: 'easy' | 'medium' | 'hard', apiKey: string): Promise<{ score: number; comment: string }> {
+    if (!apiKey) {
+      return { score: 0, comment: 'AI scoring is disabled. Please set an API key.' };
+    }
+
     const prompt = `
       Score this interview answer on a scale of 0-10 and provide a brief constructive comment.
       
@@ -167,8 +171,16 @@ export class AIService {
   }
 
   async generateFinalSummary(answers: InterviewAnswer[], candidateName: string, apiKey: string): Promise<{ summary: string; overallScore: number }> {
-    const totalScore = answers.reduce((sum, answer) => sum + answer.aiScore, 0);
+    // Safely calculate total score, accounting for potentially missing scores (due to no API key on some answers)
+    const totalScore = answers.reduce((sum, answer) => sum + (answer.aiScore || 0), 0);
     const averageScore = answers.length > 0 ? totalScore / answers.length : 0;
+
+    if (!apiKey) {
+      return {
+        summary: 'AI summary is disabled. Please set an API key to enable this feature.',
+        overallScore: 0
+      };
+    }
     
     const answersText = answers.map((answer, index) => 
       `Question ${index + 1} (${answer.difficulty}): ${answer.question}\nAnswer: ${answer.answer}\nScore: ${answer.aiScore}/10\n`
@@ -204,7 +216,7 @@ export class AIService {
     } catch (error) {
       console.error('Error generating summary:', error);
       return {
-        summary: `${candidateName} completed the interview with an average score of ${averageScore.toFixed(1)}/10. Further evaluation recommended.`,
+        summary: `${candidateName} completed the interview. AI summary failed to generate.`,
         overallScore: averageScore
       };
     }
