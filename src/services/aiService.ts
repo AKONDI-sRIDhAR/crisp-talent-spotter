@@ -42,7 +42,7 @@ export class AIService {
     const timeMap = {
       easy: 20,
       medium: 60,
-      hard: 120
+      hard: 120,
     };
 
     const difficultyContext = {
@@ -51,8 +51,8 @@ export class AIService {
       hard: 'advanced concepts, complex algorithms, system design, or challenging technical problems'
     };
 
-    const previousQuestionsText = previousQuestions.length > 0 
-      ? `\n\nPrevious questions asked (do not repeat these):\n${previousQuestions.join('\n')}`
+    const previousQuestionsText = previousQuestions.length > 0
+      ? `\n\nCRITICAL: Do NOT repeat any of these previous questions:\n${previousQuestions.join('\n- ')}`
       : '';
 
     const prompt = `
@@ -75,6 +75,8 @@ export class AIService {
         "question": "[The question text]",
         "options": ["A) [Option A]", "B) [Option B]", "C) [Option C]", "D) [Option D]"]
       }
+
+      To ensure variety, use this random seed in your generation process: ${Math.random()}
     `;
 
     try {
@@ -85,9 +87,12 @@ export class AIService {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
+        // Clean up markdown from the question
+        const cleanQuestion = parsed.question.replace(/\*\*/g, '');
+
         return {
           id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          question: parsed.question,
+          question: cleanQuestion,
           difficulty,
           timeLimit: timeMap[difficulty],
           options: parsed.options
