@@ -175,10 +175,16 @@ const InterviewChat: React.FC = () => {
 
     setIsLoading(true);
 
+    const scoreWeights = {
+      easy: 0.5,
+      medium: 2,
+      hard: 5,
+    };
+
     try {
       // Score all answers at the end
       const scoredAnswers = [];
-      let totalScore = 0;
+      let finalTotalScore = 0;
 
       for (const answer of currentCandidate.answers) {
         const { score, comment } = await aiService.scoreAnswer(
@@ -187,17 +193,17 @@ const InterviewChat: React.FC = () => {
           answer.difficulty
         );
         
+        const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
+
         const scoredAnswer = {
           ...answer,
-          aiScore: score,
-          aiComment: comment
+          aiScore: score, // Keep original 0-10 score for AI feedback
+          aiComment: comment,
         };
         
         scoredAnswers.push(scoredAnswer);
-        totalScore += score;
+        finalTotalScore += weightedScore;
       }
-
-      const averageScore = scoredAnswers.length > 0 ? totalScore / scoredAnswers.length : 0;
 
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
@@ -207,7 +213,7 @@ const InterviewChat: React.FC = () => {
       const finalCandidate: Candidate = {
         ...currentCandidate,
         answers: scoredAnswers,
-        score: Math.round(averageScore * 10) / 10,
+        score: finalTotalScore,
         aiSummary: summary,
         status: 'completed',
         endTime: new Date()
@@ -216,7 +222,7 @@ const InterviewChat: React.FC = () => {
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        content: `🎉 **Interview Complete!**\n\n**Final Score: ${Math.round(averageScore * 10) / 10}/10**\n\n${summary}\n\nThank you for taking the interview, ${currentCandidate.name}!`,
+        content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${currentCandidate.name}!`,
         timestamp: new Date()
       };
 
