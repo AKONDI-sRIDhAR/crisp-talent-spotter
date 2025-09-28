@@ -63,88 +63,65 @@ const InterviewChat: React.FC = () => {
     };
   }, [timerActive, timeRemaining]);
 
-  // Dynamic question generation logic (Adopted from 'main' branch)
-  const generateNextQuestion = async () => {
-    // Get the LATEST state directly from the store to prevent stale closures
+  // Displays the next question from the pre-generated set.
+  const displayNextQuestion = () => {
     const latestCandidate = useInterviewStore.getState().currentCandidate;
-
     if (!latestCandidate) return;
 
     const questionIndex = latestCandidate.currentQuestionIndex;
-
     if (questionIndex >= 6) {
-      await finishInterviewProcess();
+      finishInterviewProcess();
       return;
     }
 
-    setIsLoading(true);
+    const questionData = latestCandidate.questions[questionIndex];
 
-    try {
-      const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
-      const difficulty = difficulties[latestCandidate.currentQuestionIndex];
-      
-      const previousQuestions = latestCandidate.answers.map(a => a.question);
-      // Calls the dynamic AI service method
-      const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
-      
-      setCurrentQuestion(questionData);
-      setTimeRemaining(questionData.timeLimit);
-      
-      const questionMessage: Message = {
-        id: `question-${latestCandidate.currentQuestionIndex}`,
-        type: 'ai',
-        content: `Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
-        timestamp: new Date(),
-        isQuestion: true,
-        options: questionData.options
-      };
-      
-      setMessages(prev => [...prev, questionMessage]);
-      setTimerActive(true);
-    } catch (error) {
-      console.error('Error generating question:', error);
+    if (!questionData) {
       const errorMessage: Message = {
-        id: `error-${Date.now()}`,
+        id: `error-no-question-${Date.now()}`,
         type: 'ai',
-        content: 'I apologize, but there was an error generating the next question. Please try refreshing the page.',
+        content: 'Error: Could not load the next question. Please try refreshing.',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
+      return;
     }
+
+    setCurrentQuestion(questionData);
+    setTimeRemaining(questionData.timeLimit);
+
+    const questionMessage: Message = {
+      id: `question-${questionIndex}`,
+      type: 'ai',
+      content: `Question ${questionIndex + 1}/6 (${questionData.difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
+      timestamp: new Date(),
+      isQuestion: true,
+      options: questionData.options
+    };
+
+    // Avoid adding a question message if it already exists
+    if (!messages.some(m => m.id === questionMessage.id)) {
+      setMessages(prev => [...prev, questionMessage]);
+    }
+    setTimerActive(true);
   };
 
-  // Initialize interview and listen for question index changes
   useEffect(() => {
     if (!currentCandidate) return;
 
-    // 1. Initial welcome message (only if no messages exist)
     if (messages.length === 0) {
       const welcomeMessage: Message = {
         id: 'welcome',
         type: 'ai',
-        content: `Welcome, ${currentCandidate.name}! I'm your AI interviewer. You'll be taking a technical interview with 6 questions of increasing difficulty. Each question has a time limit, and I'll provide feedback on your answers. Let's begin with your first question!`,
+        content: `Welcome, ${currentCandidate.name}! I'm your AI interviewer. You'll be taking a technical interview with 6 questions from a pre-generated set. Each question has a time limit, and I'll provide AI-powered feedback on your answers. Let's begin!`,
         timestamp: new Date()
       };
       setMessages([welcomeMessage]);
+      setTimeout(() => displayNextQuestion(), 500); // Display first question after welcome
+    } else {
+      displayNextQuestion();
     }
-
-    // 2. Start/Advance the interview by generating the next question
-    // We only want to generate a new question if the index has advanced
-    // AND we are not currently loading the very first question (messages.length > 0)
-    if (currentCandidate.currentQuestionIndex >= 0 && messages.length > 0) {
-        generateNextQuestion();
-    }
-    
-  }, [currentCandidate?.currentQuestionIndex]); // Dependency on the index ensures we try to load the next question
-
-  // Call generateNextQuestion once after the welcome message is set
-  useEffect(() => {
-    if (currentCandidate && messages.length === 1 && messages[0].id === 'welcome') {
-        generateNextQuestion();
-    }
-  }, [messages.length]); // Run only when messages.length changes to 1 (i.e., after welcome)
+  }, [currentCandidate?.currentQuestionIndex]);
 
   const handleSubmitAnswer = async () => {
     if (!selectedOption || !currentQuestion || !currentCandidate) return;
