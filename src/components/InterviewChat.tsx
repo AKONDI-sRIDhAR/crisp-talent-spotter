@@ -69,6 +69,7 @@ const InterviewChat: React.FC = () => {
     submitAnswer,
     nextQuestion,
     finishInterview,
+    apiKey // RESOLUTION: Including apiKey from the store
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -94,13 +95,24 @@ const InterviewChat: React.FC = () => {
     const latestCandidate = useInterviewStore.getState().currentCandidate;
     if (!latestCandidate) return;
 
-<<<<<<< feat/interview-enhancements
-    if (latestCandidate.currentQuestionIndex >= 6) {
-=======
+    // API Key Check (Critical functionality)
+    if (!apiKey) {
+      // If key is missing in store, treat as a local error and stop processing
+      const errorMessage: Message = {
+        id: `error-no-api-key`,
+        type: 'ai',
+        content: 'The API key is missing. Please set it on the homepage to begin the interview.',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      setIsLoading(false);
+      return;
+    }
+
+
     const questionIndex = latestCandidate.currentQuestionIndex;
 
     if (questionIndex >= 6) {
->>>>>>> main
       await finishInterviewProcess();
       return;
     }
@@ -110,12 +122,9 @@ const InterviewChat: React.FC = () => {
       const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
       const difficulty = difficulties[latestCandidate.currentQuestionIndex];
       const previousQuestions = latestCandidate.answers.map(a => a.question);
-<<<<<<< feat/interview-enhancements
-=======
       
-      // The service now reads the API key from the environment
->>>>>>> main
-      const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
+      // Pass apiKey to the service call
+      const questionData = await aiService.generateQuestion(difficulty, previousQuestions, apiKey);
       
       setCurrentQuestion(questionData);
       setTimeRemaining(questionData.timeLimit);
@@ -133,8 +142,6 @@ const InterviewChat: React.FC = () => {
       setTimerActive(true);
     } catch (error) {
       console.error('Error generating question:', error);
-<<<<<<< feat/interview-enhancements
-=======
       
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
@@ -143,7 +150,6 @@ const InterviewChat: React.FC = () => {
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
->>>>>>> main
     } finally {
       setIsLoading(false);
     }
@@ -151,7 +157,11 @@ const InterviewChat: React.FC = () => {
 
   useEffect(() => {
     if (!currentCandidate) return;
-    if (!import.meta.env.VITE_GEMINI_API_KEY) {
+    
+    // Check if the API key is locally missing (assuming VITE_GEMINI_API_KEY is not set globally
+    // and must be handled by the user input logic on the Landing Page.)
+    // If the apiKey from the store is missing, we must set the warning state.
+    if (!apiKey) {
       setApiKeyMissing(true);
       return;
     }
@@ -170,7 +180,7 @@ const InterviewChat: React.FC = () => {
     if (currentCandidate.currentQuestionIndex >= 0 && messages.length > 0) {
       generateNextQuestion();
     }
-  }, [currentCandidate?.currentQuestionIndex]);
+  }, [currentCandidate?.currentQuestionIndex, apiKey]); // Depend on apiKey to restart if user enters it
 
   useEffect(() => {
     if (currentCandidate && !apiKeyMissing && messages.length === 1 && messages[0].id === 'welcome') {
@@ -217,19 +227,7 @@ const InterviewChat: React.FC = () => {
     try {
       const scoreWeights = { easy: 0.5, medium: 2, hard: 5 };
       let finalTotalScore = 0;
-<<<<<<< feat/interview-enhancements
-      const scoredAnswers = await Promise.all(
-        latestCandidate.answers.map(async (answer) => {
-          let score = 0, comment = 'No answer was provided.';
-          if (answer.answer !== 'No answer selected due to time limit.') {
-            const result = await aiService.scoreAnswer(answer.question, answer.answer, answer.difficulty);
-            score = result.score;
-            comment = result.comment;
-          }
-          finalTotalScore += (score / 10) * scoreWeights[answer.difficulty];
-          return { ...answer, aiScore: score, aiComment: comment };
-        })
-=======
+      const scoredAnswers = [];
 
       for (const answer of latestCandidate.answers) {
         let score = 0;
@@ -237,11 +235,12 @@ const InterviewChat: React.FC = () => {
 
         // Conditional scoring logic (Avoids API call for known time-out answers)
         if (answer.answer !== 'No answer selected due to time limit.') {
-          // The service now reads the API key from the environment
+          // Pass apiKey to the service call
           const aiResult = await aiService.scoreAnswer(
             answer.question,
             answer.answer,
-            answer.difficulty
+            answer.difficulty,
+            apiKey! // apiKey is checked at start of finishInterviewProcess if we adopt the earlier logic
           );
           score = aiResult.score;
           comment = aiResult.comment;
@@ -259,20 +258,24 @@ const InterviewChat: React.FC = () => {
         finalTotalScore += weightedScore;
       }
 
-      // The service now reads the API key from the environment
+      // Pass apiKey to the service call
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
-        latestCandidate.name
->>>>>>> main
+        latestCandidate.name,
+        latestCandidate.resumeSummary || null, // Pass resume summary from candidate state
+        apiKey!
       );
 
-      const { summary } = await aiService.generateFinalSummary(scoredAnswers, latestCandidate.name);
-      const finalCandidate: Candidate = { ...latestCandidate, answers: scoredAnswers, score: finalTotalScore, aiSummary: summary, status: 'completed', endTime: new Date() };
+      const finalCandidate: Candidate = {
+        ...latestCandidate,
+        answers: scoredAnswers,
+        score: finalTotalScore,
+        aiSummary: summary,
+        status: 'completed',
+        endTime: new Date()
+      };
 
-<<<<<<< feat/interview-enhancements
-=======
       // Conditional logic for the final message content
->>>>>>> main
       const finalMessageContent = summary && !summary.includes('disabled')
         ? `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`
         : `🎉 **Interview Complete!**\n\nThank you for taking the interview, ${latestCandidate.name}! Your responses have been saved.`;
@@ -282,7 +285,13 @@ const InterviewChat: React.FC = () => {
       setTimeout(() => finishInterview(finalCandidate), 5000);
     } catch (error) {
       console.error('Error finishing interview:', error);
-      const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date(), aiSummary: 'An error occurred during the final analysis.', score: 0 };
+      const candidateOnError = { 
+        ...latestCandidate, 
+        status: 'completed' as const, 
+        endTime: new Date(), 
+        aiSummary: 'An error occurred during the final analysis.', 
+        score: 0 
+      };
       finishInterview(candidateOnError);
     } finally {
       setIsLoading(false);
