@@ -8,25 +8,23 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useInterviewStore } from '@/store/interviewStore';
-import { aiService } from '@/services/aiService';
+import pdfParse from 'pdf-parse';
+import { Buffer } from 'buffer';
 
 interface ResumeUploadProps {
-  onComplete: (data: { name: string; email: string; phone: string; resumeText: string }) => void;
+  onComplete: (data: { name: string; email: string; phone: string; resumeText: string; resumeDataUrl: string; }) => void;
 }
 
 const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'error' | 'success'>('idle');
   const [error, setError] = useState<string>('');
   const [resumeText, setResumeText] = useState<string>('');
-  const [extractedData, setExtractedDataLocal] = useState<{ name?: string; email?: string; phone?: string }>({});
+  const [resumeDataUrl, setResumeDataUrl] = useState<string>('');
   const [manualData, setManualData] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
   
-  const { setExtractedData: setStoreExtractedData } = useInterviewStore();
-
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       'application/pdf': ['.pdf'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
     },
     maxFiles: 1,
     maxSize: 10 * 1024 * 1024, // 10MB
@@ -41,45 +39,25 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     setError('');
 
     try {
-      // Parse the document
       setUploadStatus('processing');
       
-      // Since we can't use the document parsing tool here, we'll simulate extraction
-      // In a real implementation, you would use a PDF parsing library
-      const simulatedText = `
-        John Doe
-        Software Engineer
-        Email: john.doe@email.com
-        Phone: +1 (555) 123-4567
-        
-        Experience:
-        - Full Stack Developer at Tech Corp (2020-2023)
-        - Frontend Developer at StartupX (2018-2020)
-        
-        Skills:
-        - React, Node.js, TypeScript
-        - MongoDB, PostgreSQL
-        - AWS, Docker
-      `;
+      // Create a data URL for embedding
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setResumeDataUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
 
-      const extracted = await aiService.extractResumeData(simulatedText);
-      
-      setExtractedDataLocal(extracted);
-      setStoreExtractedData(extracted);
-      
-      // Pre-fill manual fields with extracted data
-      setManualData({
-        name: extracted.name || '',
-        email: extracted.email || '',
-        phone: extracted.phone || ''
-      });
+      const arrayBuffer = await file.arrayBuffer();
+      // Explicitly use the imported Buffer to handle the arrayBuffer for pdf-parse
+      const pdfData = await pdfParse(Buffer.from(arrayBuffer));
+      setResumeText(pdfData.text); // Store the resume text for AI analysis later
 
-      setResumeText(simulatedText); // Store the resume text in state
       setUploadStatus('success');
 
     } catch (err) {
       console.error('Error processing resume:', err);
-      setError('Failed to process resume. Please try again.');
+      setError('Failed to process resume. Please make sure it is a valid PDF file.');
       setUploadStatus('error');
     }
   }
@@ -88,7 +66,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     setManualData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleProceed = (resumeText: string = '') => {
+  const handleProceed = () => {
     // Validate required fields
     if (!manualData.name || !manualData.email || !manualData.phone) {
       setError('Please fill in all required fields.');
@@ -102,9 +80,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       return;
     }
 
-    // Update store with final data
-    setStoreExtractedData(manualData);
-    onComplete({ ...manualData, resumeText });
+    onComplete({ ...manualData, resumeText, resumeDataUrl });
   };
 
   return (
@@ -116,7 +92,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       >
         <h2 className="text-3xl font-bold">Upload Your Resume</h2>
         <p className="text-muted-foreground">
-          Upload your resume and we'll extract your information automatically
+          Please upload your resume and fill in your details below to begin.
         </p>
       </motion.div>
 
@@ -152,7 +128,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
                       {isDragActive ? 'Drop your resume here' : 'Drop your resume here, or click to browse'}
                     </p>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Supports PDF and DOCX files (Max 10MB)
+                      PDF files only (Max 10MB)
                     </p>
                   </div>
                 </>
@@ -186,7 +162,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       </Card>
 
       {/* Manual Data Entry */}
-      {(uploadStatus === 'success' || uploadStatus === 'error') && (
+      {(uploadStatus === 'success' || uploadStatus === 'error' || manualData.name || manualData.email || manualData.phone) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -194,7 +170,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
         >
           <Card>
             <CardHeader>
-              <CardTitle>Verify Your Information</CardTitle>
+              <CardTitle>Enter Your Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
@@ -233,15 +209,6 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
                     placeholder="Enter your phone number"
                   />
                 </div>
-
-              {extractedData.name && (
-                <Alert>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <AlertDescription>
-                    We've pre-filled the form with information from your resume. Please verify and update as needed.
-                  </AlertDescription>
-                </Alert>
-              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -263,7 +230,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
           transition={{ delay: 0.3 }}
           className="flex justify-center"
         >
-          <Button onClick={() => handleProceed(resumeText)} size="lg" className="px-8">
+          <Button onClick={handleProceed} size="lg" className="px-8">
             Start Interview
           </Button>
         </motion.div>

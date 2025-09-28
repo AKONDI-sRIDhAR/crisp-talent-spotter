@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import Timer from '@/components/ui/timer';
-import { useInterviewStore, Candidate } from '@/store/interviewStore'; // Assuming Candidate type is exported from store
+import { useInterviewStore, Candidate } from '@/store/interviewStore';
 import { aiService } from '@/services/aiService';
 
 interface Message {
@@ -36,7 +36,7 @@ const InterviewChat: React.FC = () => {
     submitAnswer,
     nextQuestion,
     finishInterview,
-    updateCandidate
+    updateCandidate,
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -47,7 +47,6 @@ const InterviewChat: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Timer logic
   useEffect(() => {
     if (timerActive && timeRemaining > 0) {
       timerRef.current = setTimeout(() => {
@@ -56,43 +55,45 @@ const InterviewChat: React.FC = () => {
     } else if (timerActive && timeRemaining <= 0) {
       handleTimeUp();
     }
-
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [timerActive, timeRemaining]);
 
-  // Dynamic question generation logic (Adopted from 'main' branch)
   const generateNextQuestion = async () => {
-    // Get the LATEST state directly from the store to prevent stale closures
-    const latestCandidate = useInterviewStore.getState().currentCandidate;
+    if (isLoading) return;
 
+    const latestCandidate = useInterviewStore.getState().currentCandidate;
     if (!latestCandidate) return;
 
     const questionIndex = latestCandidate.currentQuestionIndex;
-
     if (questionIndex >= 6) {
-      await finishInterviewProcess();
+      // The finish process is now called from the useEffect hook.
       return;
     }
 
-    setIsLoading(true);
+    // Prevent re-fetching if a question for the current index already exists in messages
+    if (messages.some(m => m.id === `question-${questionIndex}`)) {
+        return;
+    }
 
+    setIsLoading(true);
     try {
       const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
-      const difficulty = difficulties[latestCandidate.currentQuestionIndex];
-      
+      const difficulty = difficulties[questionIndex];
       const previousQuestions = latestCandidate.answers.map(a => a.question);
-      // Calls the dynamic AI service method
-      const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
+
+      const questionData = await aiService.generateQuestion(
+        difficulty,
+        previousQuestions,
+        latestCandidate.resumeText || '' // Pass resume text to the AI
+      );
       
       setCurrentQuestion(questionData);
       setTimeRemaining(questionData.timeLimit);
       
       const questionMessage: Message = {
-        id: `question-${latestCandidate.currentQuestionIndex}`,
+        id: `question-${questionIndex}`,
         type: 'ai',
         content: `Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
         timestamp: new Date(),
@@ -116,43 +117,38 @@ const InterviewChat: React.FC = () => {
     }
   };
 
-  // Initialize interview and listen for question index changes
+  // This is the corrected, stable interview flow logic.
   useEffect(() => {
     if (!currentCandidate) return;
 
-    // 1. Initial welcome message (only if no messages exist)
+    const isInterviewOver = currentCandidate.currentQuestionIndex >= 6;
+    const hasCorrectNumberOfAnswers = currentCandidate.answers.length === currentCandidate.currentQuestionIndex;
+
+    if (isInterviewOver) {
+        if (!messages.some(m => m.id === 'final')) {
+            finishInterviewProcess();
+        }
+        return;
+    }
+
     if (messages.length === 0) {
       const welcomeMessage: Message = {
         id: 'welcome',
         type: 'ai',
-        content: `Welcome, ${currentCandidate.name}! I'm your AI interviewer. You'll be taking a technical interview with 6 questions of increasing difficulty. Each question has a time limit, and I'll provide feedback on your answers. Let's begin with your first question!`,
+        content: `Welcome, ${currentCandidate.name}! I'm your AI interviewer. I will now generate 6 questions based on your resume. Let's begin!`,
         timestamp: new Date()
       };
       setMessages([welcomeMessage]);
+    } else if (hasCorrectNumberOfAnswers) {
+      generateNextQuestion();
     }
-
-    // 2. Start/Advance the interview by generating the next question
-    // We only want to generate a new question if the index has advanced
-    // AND we are not currently loading the very first question (messages.length > 0)
-    if (currentCandidate.currentQuestionIndex >= 0 && messages.length > 0) {
-        generateNextQuestion();
-    }
-    
-  }, [currentCandidate?.currentQuestionIndex]); // Dependency on the index ensures we try to load the next question
-
-  // Call generateNextQuestion once after the welcome message is set
-  useEffect(() => {
-    if (currentCandidate && messages.length === 1 && messages[0].id === 'welcome') {
-        generateNextQuestion();
-    }
-  }, [messages.length]); // Run only when messages.length changes to 1 (i.e., after welcome)
+  }, [currentCandidate?.currentQuestionIndex, currentCandidate?.answers.length]);
 
   const handleSubmitAnswer = async () => {
     if (!selectedOption || !currentQuestion || !currentCandidate) return;
 
     const timeUsed = currentQuestion.timeLimit - timeRemaining;
     
-    // Add user message
     const userMessage: Message = {
       id: `answer-${Date.now()}`,
       type: 'user',
@@ -165,17 +161,14 @@ const InterviewChat: React.FC = () => {
     setSelectedOption('');
     setIsLoading(true);
 
-    // Submit answer to store (no scoring here)
     submitAnswer(selectedOption, timeUsed);
     
-    // Check if the interview is over
     const latestCandidate = useInterviewStore.getState().currentCandidate;
     if (latestCandidate && latestCandidate.answers.length >= 6) {
       await finishInterviewProcess();
       return;
     }
 
-    // Add transition message (Cleaned up redundant comment)
     const transitionMessage: Message = {
       id: `transition-${Date.now()}`,
       type: 'ai',
@@ -185,16 +178,15 @@ const InterviewChat: React.FC = () => {
     
     setMessages(prev => [...prev, transitionMessage]);
     
-    // Move to next question (This increments the index, triggering the useEffect above)
     nextQuestion();
-    setIsLoading(false); // Reset loading state
+    setIsLoading(false);
   };
 
   const handleTimeUp = () => {
     if (!selectedOption) {
       setSelectedOption('No answer selected due to time limit.');
     }
-    handleSubmitAnswer();
+    setTimeout(() => handleSubmitAnswer(), 100);
   };
 
   const finishInterviewProcess = async () => {
@@ -203,98 +195,73 @@ const InterviewChat: React.FC = () => {
 
     setIsLoading(true);
 
-    const scoreWeights = {
-      easy: 0.5,
-      medium: 2,
-      hard: 5,
-    };
+    const scoreWeights = { easy: 0.5, medium: 2, hard: 5 };
+    let finalTotalScore = 0;
+    const scoredAnswers = [];
 
-    try {
-      // Score all answers at the end
-      const scoredAnswers = [];
-      let finalTotalScore = 0;
+    for (const answer of latestCandidate.answers) {
+      let score = 0;
+      let comment = 'No answer was provided before the time ran out.';
 
-      for (const answer of latestCandidate.answers) {
-        const { score, comment } = await aiService.scoreAnswer(
-          answer.question,
-          answer.answer,
-          answer.difficulty
-        );
-        
-        const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
-
-        const scoredAnswer = {
-          ...answer,
-          aiScore: score, // Keep original 0-10 score for AI feedback
-          aiComment: comment,
-        };
-        
-        scoredAnswers.push(scoredAnswer);
-        finalTotalScore += weightedScore;
+      if (answer.answer !== 'No answer selected due to time limit.') {
+        const aiResult = await aiService.scoreAnswer(answer.question, answer.answer, answer.difficulty);
+        score = aiResult.score;
+        comment = aiResult.comment;
       }
 
-      const { summary } = await aiService.generateFinalSummary(
-        scoredAnswers,
-        latestCandidate.name
-      );
+      const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
+      finalTotalScore += weightedScore;
 
-      const finalCandidate: Candidate = {
-        ...latestCandidate,
-        answers: scoredAnswers,
-        score: finalTotalScore,
-        aiSummary: summary,
-        status: 'completed',
-        endTime: new Date()
-      };
-
-      const finalMessage: Message = {
-        id: 'final',
-        type: 'ai',
-        // Merged the content, keeping the bolder formatting from 'main'
-        content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, finalMessage]);
-      
-      setTimeout(() => {
-        finishInterview(finalCandidate);
-      }, 5000);
-
-    } catch (error) {
-      console.error('Error finishing interview:', error);
-      
-      // Kept the cleaned-up error handling logic
-      const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
-      finishInterview(candidateOnError); 
-      
-    } finally {
-      setIsLoading(false);
+      scoredAnswers.push({ ...answer, aiScore: score, aiComment: comment });
     }
+
+    const { summary } = await aiService.generateFinalSummary(scoredAnswers, latestCandidate.name);
+    const finalCandidate: Candidate = {
+      ...latestCandidate,
+      answers: scoredAnswers,
+      score: finalTotalScore,
+      aiSummary: summary,
+      status: 'completed',
+      endTime: new Date()
+    };
+
+    updateCandidate(finalCandidate.id, finalCandidate);
+
+    const finalMessage: Message = {
+      id: 'final',
+      type: 'ai',
+      content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, finalMessage]);
+
+    setTimeout(() => {
+      finishInterview(finalCandidate);
+    }, 5000);
+
+    setIsLoading(false);
   };
 
   if (!currentCandidate) return null;
 
-  const progress = (currentCandidate.currentQuestionIndex / 6) * 100;
+  const progress = (currentCandidate.answers.length / 6) * 100;
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-background to-muted/20">
-      {/* Header */}
       <div className="border-b bg-card/50 backdrop-blur-sm p-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold">{currentCandidate.name}</h2>
             <p className="text-sm text-muted-foreground">Technical Interview</p>
           </div>
-          
           <div className="flex items-center gap-4">
             <div className="text-right">
               <div className="text-sm font-medium">
-                Question {currentCandidate.currentQuestionIndex + 1}/6
+                Question {Math.min(currentCandidate.currentQuestionIndex + 1, 6)}/6
               </div>
               <Progress value={progress} className="w-32" />
             </div>
-            
             {currentQuestion && timerActive && (
               <Timer
                 timeRemaining={timeRemaining}
@@ -307,8 +274,6 @@ const InterviewChat: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="max-w-4xl mx-auto space-y-4">
           <AnimatePresence>
@@ -320,48 +285,26 @@ const InterviewChat: React.FC = () => {
                 exit={{ opacity: 0, y: -20 }}
                 className={`flex gap-3 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <Card className={`max-w-2xl ${
-                  message.type === 'user' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-card/80 backdrop-blur-sm'
-                }`}>
+                <Card className={`max-w-2xl ${message.type === 'user' ? 'bg-primary text-primary-foreground' : 'bg-card/80 backdrop-blur-sm'}`}>
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      {message.type === 'ai' ? (
-                        <Bot className="w-6 h-6 text-primary flex-shrink-0 mt-1" />
-                      ) : (
-                        <User className="w-6 h-6 text-primary-foreground flex-shrink-0 mt-1" />
-                      )}
-                      
+                      {message.type === 'ai' ? <Bot className="w-6 h-6 text-primary flex-shrink-0 mt-1" /> : <User className="w-6 h-6 text-primary-foreground flex-shrink-0 mt-1" />}
                       <div className="flex-1">
-                        <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                          {message.content}
-                        </div>
-                        
-                        {/* MCQ Options */}
+                        <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
                         {message.isQuestion && message.options && currentQuestion && timerActive && (
                           <div className="mt-4 space-y-2">
                             {message.options.map((option, index) => (
                               <button
                                 key={index}
                                 onClick={() => setSelectedOption(option)}
-                                className={`w-full text-left p-3 rounded-lg border transition-all ${
-                                  selectedOption === option
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                                }`}
+                                className={`w-full text-left p-3 rounded-lg border transition-all ${selectedOption === option ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:border-primary/50 hover:bg-muted/50'}`}
                               >
                                 {option}
                               </button>
                             ))}
                           </div>
                         )}
-                        
-                        <div className={`text-xs mt-2 ${
-                          message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                        }`}>
-                          {message.timestamp.toLocaleTimeString()}
-                        </div>
+                        <div className={`text-xs mt-2 ${message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{message.timestamp.toLocaleTimeString()}</div>
                       </div>
                     </div>
                   </CardContent>
@@ -369,13 +312,8 @@ const InterviewChat: React.FC = () => {
               </motion.div>
             ))}
           </AnimatePresence>
-          
           {isLoading && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex justify-start"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
               <Card className="bg-card/80 backdrop-blur-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
@@ -390,21 +328,13 @@ const InterviewChat: React.FC = () => {
               </Card>
             </motion.div>
           )}
-          
           <div ref={messagesEndRef} />
         </div>
       </div>
-
-      {/* Submit Button */}
-      {currentQuestion && timerActive && selectedOption && (
+      {currentQuestion && timerActive && (
         <div className="border-t bg-card/50 backdrop-blur-sm p-4">
           <div className="max-w-4xl mx-auto flex justify-center">
-            <Button
-              onClick={handleSubmitAnswer}
-              disabled={!selectedOption || isLoading}
-              size="lg"
-              className="px-8"
-            >
+            <Button onClick={handleSubmitAnswer} disabled={!selectedOption || isLoading} size="lg" className="px-8">
               <CheckCircle2 className="w-4 h-4 mr-2" />
               Submit Answer
             </Button>
