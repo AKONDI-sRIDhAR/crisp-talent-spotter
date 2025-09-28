@@ -35,8 +35,7 @@ const InterviewChat: React.FC = () => {
     setTimeRemaining,
     submitAnswer,
     nextQuestion,
-    finishInterview,
-    apiKey // Included apiKey from the store
+    finishInterview
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -64,25 +63,12 @@ const InterviewChat: React.FC = () => {
     };
   }, [timerActive, timeRemaining]);
 
-  // Dynamic question generation logic
+  // Dynamic question generation logic (Adopted from 'main' branch)
   const generateNextQuestion = async () => {
     // Get the LATEST state directly from the store to prevent stale closures
     const latestCandidate = useInterviewStore.getState().currentCandidate;
 
     if (!latestCandidate) return;
-
-    // API Key Check (Critical functionality added)
-    if (!apiKey) {
-      const errorMessage: Message = {
-        id: `error-no-api-key`,
-        type: 'ai',
-        content: 'The API key is missing. Please set it on the homepage to begin the interview.',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-      setIsLoading(false);
-      return;
-    }
 
     const questionIndex = latestCandidate.currentQuestionIndex;
 
@@ -98,9 +84,8 @@ const InterviewChat: React.FC = () => {
       const difficulty = difficulties[latestCandidate.currentQuestionIndex];
       
       const previousQuestions = latestCandidate.answers.map(a => a.question);
-      
-      // Pass apiKey to the service call
-      const questionData = await aiService.generateQuestion(difficulty, previousQuestions, apiKey);
+      // Calls the dynamic AI service method
+      const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
       
       setCurrentQuestion(questionData);
       setTimeRemaining(questionData.timeLimit);
@@ -118,12 +103,10 @@ const InterviewChat: React.FC = () => {
       setTimerActive(true);
     } catch (error) {
       console.error('Error generating question:', error);
-      
-      // RESOLUTION: Using a generic error message
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
         type: 'ai',
-        content: `I apologize, but an unexpected error occurred. Please try refreshing the page.`,
+        content: 'I apologize, but there was an error generating the next question. Please try refreshing the page.',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -208,7 +191,6 @@ const InterviewChat: React.FC = () => {
 
   const handleTimeUp = () => {
     if (!selectedOption) {
-      // Set a flag answer for time up
       setSelectedOption('No answer selected due to time limit.');
     }
     handleSubmitAnswer();
@@ -235,14 +217,12 @@ const InterviewChat: React.FC = () => {
         let score = 0;
         let comment = 'No answer was provided before the time ran out.';
 
-        // RESOLUTION: Conditional scoring logic adopted from feature/dynamic-interview-flow
+        // Only call the AI if a real answer was given
         if (answer.answer !== 'No answer selected due to time limit.') {
-          // Pass apiKey to the service call
           const aiResult = await aiService.scoreAnswer(
             answer.question,
             answer.answer,
-            answer.difficulty,
-            apiKey
+            answer.difficulty
           );
           score = aiResult.score;
           comment = aiResult.comment;
@@ -252,7 +232,7 @@ const InterviewChat: React.FC = () => {
 
         const scoredAnswer = {
           ...answer,
-          aiScore: score, // Keep original 0-10 score for AI feedback
+          aiScore: score,
           aiComment: comment,
         };
         
@@ -260,11 +240,9 @@ const InterviewChat: React.FC = () => {
         finalTotalScore += weightedScore;
       }
 
-      // Pass apiKey to the service call
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
-        latestCandidate.name,
-        apiKey
+        latestCandidate.name
       );
 
       const finalCandidate: Candidate = {
@@ -276,15 +254,10 @@ const InterviewChat: React.FC = () => {
         endTime: new Date()
       };
 
-      // RESOLUTION: Using the conditional logic for the final message content
-      const finalMessageContent = apiKey && summary && !summary.includes('disabled')
-        ? `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`
-        : `🎉 **Interview Complete!**\n\nThank you for taking the interview, ${latestCandidate.name}! Your responses have been saved.`;
-
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        content: finalMessageContent,
+        content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
         timestamp: new Date()
       };
 
@@ -296,14 +269,7 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      // RESOLUTION: Using the more detailed error object for state persistence
-      const candidateOnError = {
-        ...latestCandidate,
-        status: 'completed' as const,
-        endTime: new Date(),
-        aiSummary: 'An error occurred during the final analysis.',
-        score: 0,
-      };
+      const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
       finishInterview(candidateOnError); 
       
     } finally {

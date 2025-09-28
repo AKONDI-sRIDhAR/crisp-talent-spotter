@@ -50,24 +50,6 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
-## Configuration
-
-To enable the AI-powered features (dynamic question generation, resume analysis, scoring), you need to provide a Google AI API key.
-
-1.  **Create a `.env` file:** In the root of the project, create a new file named `.env` by copying the example file:
-    ```sh
-    cp .env.example .env
-    ```
-
-2.  **Set the API Key:** Open the `.env` file and replace `"YOUR_API_KEY_HERE"` with your actual Google AI API key.
-    ```
-    VITE_GOOGLE_AI_API_KEY="your-actual-api-key-goes-here"
-    ```
-
-### Deploying to Vercel/Netlify
-
-When deploying your project to a hosting service like Vercel or Netlify, you will need to set the `VITE_GOOGLE_AI_API_KEY` as an environment variable in your project's settings on that platform. Do not expose your `.env` file publicly.
-
 ## What technologies are used for this project?
 
 This project is built with:
