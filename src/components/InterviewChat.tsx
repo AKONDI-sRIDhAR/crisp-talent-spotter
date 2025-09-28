@@ -36,7 +36,6 @@ const InterviewChat: React.FC = () => {
     submitAnswer,
     nextQuestion,
     finishInterview,
-    apiKey // RESOLUTION: Including apiKey from the store
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -71,19 +70,6 @@ const InterviewChat: React.FC = () => {
 
     if (!latestCandidate) return;
 
-    // API Key Check (Critical functionality)
-    if (!apiKey) {
-      const errorMessage: Message = {
-        id: `error-no-api-key`,
-        type: 'ai',
-        content: 'The API key is missing. Please set it on the homepage to begin the interview.',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-      setIsLoading(false);
-      return;
-    }
-
     const questionIndex = latestCandidate.currentQuestionIndex;
 
     if (questionIndex >= 6) {
@@ -99,8 +85,8 @@ const InterviewChat: React.FC = () => {
       
       const previousQuestions = latestCandidate.answers.map(a => a.question);
       
-      // Pass apiKey to the service call
-      const questionData = await aiService.generateQuestion(difficulty, previousQuestions, apiKey);
+      // The service now reads the API key from the environment
+      const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
       
       setCurrentQuestion(questionData);
       setTimeRemaining(questionData.timeLimit);
@@ -122,7 +108,7 @@ const InterviewChat: React.FC = () => {
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
         type: 'ai',
-        content: `I apologize, but an unexpected error occurred. Please try refreshing the page.`,
+        content: `I apologize, but an unexpected error occurred. This may be due to a missing or invalid API key. Please contact the administrator.`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -236,12 +222,11 @@ const InterviewChat: React.FC = () => {
 
         // Conditional scoring logic (Avoids API call for known time-out answers)
         if (answer.answer !== 'No answer selected due to time limit.') {
-          // Pass apiKey to the service call
+          // The service now reads the API key from the environment
           const aiResult = await aiService.scoreAnswer(
             answer.question,
             answer.answer,
-            answer.difficulty,
-            apiKey
+            answer.difficulty
           );
           score = aiResult.score;
           comment = aiResult.comment;
@@ -259,11 +244,10 @@ const InterviewChat: React.FC = () => {
         finalTotalScore += weightedScore;
       }
 
-      // Pass apiKey to the service call
+      // The service now reads the API key from the environment
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
-        latestCandidate.name,
-        apiKey
+        latestCandidate.name
       );
 
       const finalCandidate: Candidate = {
@@ -276,7 +260,7 @@ const InterviewChat: React.FC = () => {
       };
 
       // Conditional logic for the final message content
-      const finalMessageContent = apiKey && summary && !summary.includes('disabled')
+      const finalMessageContent = summary && !summary.includes('disabled')
         ? `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`
         : `🎉 **Interview Complete!**\n\nThank you for taking the interview, ${latestCandidate.name}! Your responses have been saved.`;
 
