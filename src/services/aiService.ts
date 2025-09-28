@@ -13,9 +13,6 @@ const getStaticQuestion = (
 ): InterviewQuestion => {
   const timeMap = { easy: 20, medium: 60, hard: 120 };
   
-  // Use a simple rotation mechanism based on the number of previous questions
-  const index = previousQuestions.length % 3;
-
   const fallbacks: Record<'easy' | 'medium' | 'hard', InterviewQuestion[]> = {
     easy: [
       {
@@ -122,8 +119,8 @@ export class AIService {
   }
 
   // --- Resume Extraction ---
-  // NOTE: resumeData is updated to include 'summary' from the new logic
   async extractResumeData(resumeText: string, apiKey: string) {
+    // RESOLUTION: Unified API key check
     if (!apiKey) return { name: null, email: null, phone: null, summary: null };
     if (!resumeText) return { name: null, email: null, phone: null, summary: null };
 
