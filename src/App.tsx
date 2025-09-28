@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,7 +7,6 @@ import LandingPage from './components/LandingPage';
 import IntervieweePage from './components/IntervieweePage';
 import InterviewerDashboard from './components/InterviewerDashboard';
 import InterviewerLogin from './components/InterviewerLogin';
-import WelcomeBackModal from './components/WelcomeBackModal';
 import { useInterviewStore } from './store/interviewStore';
 
 const queryClient = new QueryClient();
@@ -16,20 +15,7 @@ const App = () => {
   const { 
     currentMode, 
     setCurrentMode,
-    currentCandidate, 
-    setShowWelcomeBack,
-    showWelcomeBack 
   } = useInterviewStore();
-
-  // Check for incomplete interviews on app load
-  useEffect(() => {
-    if (currentCandidate && 
-        currentCandidate.status === 'in-progress' && 
-        currentCandidate.answers.length > 0 && 
-        currentCandidate.answers.length < 6) {
-      setShowWelcomeBack(true);
-    }
-  }, [currentCandidate, setShowWelcomeBack]);
 
   const renderCurrentPage = () => {
     switch (currentMode) {
@@ -58,9 +44,6 @@ const App = () => {
         
         <Toaster />
         <Sonner />
-        
-        {/* Welcome Back Modal */}
-        {showWelcomeBack && <WelcomeBackModal />}
       </TooltipProvider>
     </QueryClientProvider>
   );
