@@ -64,7 +64,7 @@ const InterviewChat: React.FC = () => {
     };
   }, [timerActive, timeRemaining]);
 
-  // Dynamic question generation logic
+  // RESOLUTION: Dynamic question generation logic (re-implementing the intended async logic)
   const generateNextQuestion = async () => {
     // Get the LATEST state directly from the store to prevent stale closures
     const latestCandidate = useInterviewStore.getState().currentCandidate;

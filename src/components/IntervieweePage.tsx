@@ -29,8 +29,8 @@ const IntervieweePage: React.FC = () => {
     addCandidate,
     updateCandidate,
     setCurrentMode,
-    questionSetIndex, // Kept for minimal change, though unused in dynamic flow
-    incrementQuestionSetIndex, // Kept for minimal change, though unused in dynamic flow
+    questionSetIndex, // Kept for minimal change, though unused
+    incrementQuestionSetIndex, // Kept for minimal change, though unused
   } = useInterviewStore();
 
   useEffect(() => {

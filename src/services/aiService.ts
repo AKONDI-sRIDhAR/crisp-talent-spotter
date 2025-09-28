@@ -1,11 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
-// FIX: Removed the faulty import: import { getStaticQuestion } from '../lib/staticQuestions';
+// FIX: The original import below is REMOVED, and the function is defined locally to resolve the build error.
+// import { getStaticQuestion } from '../lib/staticQuestions'; 
 
-<<<<<<< HEAD
 /**
- * Fallback function to return a static question when the API key is missing or the AI call fails.
- * This is a temporary local implementation to fix the 'Failed to resolve import' error.
+ * Fallback implementation for getStaticQuestion.
+ * This is a necessary local implementation to resolve the "Failed to resolve import" error.
  */
 const getStaticQuestion = (
   difficulty: 'easy' | 'medium' | 'hard',
@@ -13,45 +13,91 @@ const getStaticQuestion = (
 ): InterviewQuestion => {
   const timeMap = { easy: 20, medium: 60, hard: 120 };
   
-  // Use a simple mechanism to return a non-repeating question for the fallback
-  const fallbacks: Record<'easy' | 'medium' | 'hard', InterviewQuestion> = {
-    easy: {
-      id: `fb_e`,
-      difficulty: 'easy',
-      question: 'What does `useState` return in React?',
-      options: ['A value and a function', 'An object', 'An array', 'A string'],
-      timeLimit: timeMap.easy
-    },
-    medium: {
-      id: `fb_m`,
-      difficulty: 'medium',
-      question: 'What is the purpose of middleware in Express.js?',
-      options: ['To manage database connections', 'To execute functions before the final route handler', 'To serve static files', 'To handle client-side routing'],
-      timeLimit: timeMap.medium
-    },
-    hard: {
-      id: `fb_h`,
-      difficulty: 'hard',
-      question: 'Explain the concept of Virtual DOM reconciliation in React.',
-      options: ['It updates the entire DOM tree in every render', 'It generates a synthetic DOM representation in memory', 'It compares the new Virtual DOM tree with the previous one to find differences', 'It skips rendering entirely'],
-      timeLimit: timeMap.hard
-    },
+  // Use a simple rotation mechanism based on the number of previous questions
+  const index = previousQuestions.length % 3;
+
+  const fallbacks: Record<'easy' | 'medium' | 'hard', InterviewQuestion[]> = {
+    easy: [
+      {
+        id: `fb_e1`,
+        difficulty: 'easy',
+        question: 'What does `useState` return in React?',
+        options: ['A value and a function', 'An object', 'An array', 'A string'],
+        timeLimit: timeMap.easy
+      },
+      {
+        id: `fb_e2`,
+        difficulty: 'easy',
+        question: 'Which HTTP method is typically idempotent?',
+        options: ['POST', 'PUT', 'DELETE', 'GET'],
+        timeLimit: timeMap.easy
+      },
+      {
+        id: `fb_e3`,
+        difficulty: 'easy',
+        question: 'In JavaScript, what is the purpose of `event.preventDefault()`?',
+        options: ['Stops event bubbling', 'Prevents the default browser action', 'Cancels the function call', 'Pauses script execution'],
+        timeLimit: timeMap.easy
+      },
+    ],
+    medium: [
+      {
+        id: `fb_m1`,
+        difficulty: 'medium',
+        question: 'Explain the concept of prop drilling in React and how to avoid it.',
+        options: ['Using Context API', 'Using state lifting', 'Using Redux', 'All of the above'],
+        timeLimit: timeMap.medium
+      },
+      {
+        id: `fb_m2`,
+        difficulty: 'medium',
+        question: 'What is a closure in JavaScript?',
+        options: ['A scope wrapper', 'A function having access to its parent scope even after the parent function has closed', 'An alternative to `this` keyword', 'A type of promise'],
+        timeLimit: timeMap.medium
+      },
+      {
+        id: `fb_m3`,
+        difficulty: 'medium',
+        question: 'How do you ensure a Node.js process does not block the event loop?',
+        options: ['Use synchronous I/O', 'Avoid CPU-intensive synchronous operations', 'Increase the number of threads', 'Decrease the heap size'],
+        timeLimit: timeMap.medium
+      },
+    ],
+    hard: [
+      {
+        id: `fb_h1`,
+        difficulty: 'hard',
+        question: 'Describe the Node.js event loop architecture and its phases.',
+        options: ['Timers, Pending Callbacks, Poll, Check, Close Callbacks', 'Timers, Poll, Check, Close', 'Call Stack, Message Queue, Event Loop', 'Input/Output, Timers, Check'],
+        timeLimit: timeMap.hard
+      },
+      {
+        id: `fb_h2`,
+        difficulty: 'hard',
+        question: 'What are the trade-offs between monolithic and microservice architectures?',
+        options: ['Deployment speed vs. codebase size', 'Scalability vs. latency', 'Simplicity vs. operational complexity', 'Data consistency vs. fault tolerance'],
+        timeLimit: timeMap.hard
+      },
+      {
+        id: `fb_h3`,
+        difficulty: 'hard',
+        question: 'How would you implement Server-Side Rendering (SSR) in a React/Node.js application?',
+        options: ['Using the `renderToString` method', 'Using Web Workers', 'By replacing React with Vue', 'By using the browser\'s history API'],
+        timeLimit: timeMap.hard
+      },
+    ],
   };
 
-  const baseQuestion = fallbacks[difficulty];
+  const selectedQuestion = fallbacks[difficulty][index];
   
-  // Simple rotation logic to prevent the exact same question string from appearing constantly
-  const suffix = ` (Fallback Q - ${previousQuestions.length + 1})`;
-
+  // Ensure the question ID is unique each time it's returned
   return {
-    ...baseQuestion,
-    id: `fb_${difficulty}_${Date.now()}`,
-    question: baseQuestion.question + suffix,
+    ...selectedQuestion,
+    id: `fb_${selectedQuestion.id}_${Date.now()}`,
+    question: selectedQuestion.question,
   };
 };
 
-=======
->>>>>>> aac6367948c6e2c83fa378f3d6944997356eb084
 export class AIService {
   
   // Method to instantiate the model for a specific API key

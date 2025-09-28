@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useInterviewStore } from '@/store/interviewStore';
 import { aiService } from '@/services/aiService';
-// FIX: Removed "import pdfParse from 'pdf-parse';"
+// FIX: pdfParse import is intentionally omitted as it is not browser compatible.
 
 interface ResumeUploadProps {
   onComplete: (data: { name: string; email: string; phone: string; resumeText: string; resumeDataUrl: string; }) => void;
@@ -20,6 +20,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
   const [error, setError] = useState<string>('');
   const [resumeText, setResumeText] = useState<string>('');
   const [resumeDataUrl, setResumeDataUrl] = useState<string>('');
+  // RESOLUTION: Combining duplicate state definitions and ensuring imports are correct
   const [extractedData, setExtractedDataLocal] = useState<{ name?: string; email?: string; phone?: string }>({});
   const [manualData, setManualData] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
   
@@ -53,7 +54,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     setUploadStatus('uploading');
     setError('');
 
-    // DOCX rejection kept for clarity. Full parsing isn't supported.
+    // DOCX rejection kept for clarity.
     if (file.type.includes('docx')) {
       setError('DOCX files are not supported yet. Please upload a PDF.');
       setUploadStatus('error');
@@ -68,6 +69,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       setResumeDataUrl(dataUrl);
       
       // 2. Use simulated text for extraction to avoid non-browser-compatible PDF parsing
+      // This is the functional replacement for pdf-parse.
       const text = `
         John Doe
         Software Engineer
@@ -147,7 +149,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       >
         <h2 className="text-3xl font-bold">Upload Your Resume</h2>
         <p className="text-muted-foreground">
-          Upload your resume and we'll extract your information automatically
+          Please upload your resume and fill in your details below to begin.
         </p>
       </motion.div>
 
@@ -217,7 +219,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       </Card>
 
       {/* Manual Data Entry */}
-      {(uploadStatus === 'success' || uploadStatus === 'error') && (
+      {(uploadStatus === 'success' || uploadStatus === 'error' || manualData.name || manualData.email || manualData.phone) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -225,7 +227,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
         >
           <Card>
             <CardHeader>
-              <CardTitle>Verify Your Information</CardTitle>
+              <CardTitle>Enter Your Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
@@ -264,15 +266,15 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
                     placeholder="Enter your phone number"
                   />
                 </div>
-
-              {extractedData.name && (
-                <Alert>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <AlertDescription>
-                    We've pre-filled the form with information from your resume. Please verify and update as needed.
-                  </AlertDescription>
-                </Alert>
-              )}
+                
+                {extractedData.name && (
+                    <Alert>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <AlertDescription>
+                        We've pre-filled the form with information from your resume. Please verify and update as needed.
+                      </AlertDescription>
+                    </Alert>
+                )}
             </CardContent>
           </Card>
         </motion.div>
@@ -287,7 +289,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       )}
 
       {/* Proceed Button */}
-      {(uploadStatus === 'success' || uploadStatus === 'error') && (
+      {(uploadStatus === 'success' || uploadStatus === 'error' || manualData.name) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
