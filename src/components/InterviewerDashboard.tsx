@@ -43,14 +43,17 @@ const InterviewerDashboard: React.FC = () => {
     });
 
   const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-green-500';
-    if (score >= 6) return 'text-yellow-500';
+    if (score >= 12) return 'text-green-500'; // 80%
+    if (score >= 9) return 'text-yellow-500'; // 60%
     return 'text-red-500';
   };
 
-  const getScoreBadgeVariant = (score: number) => {
-    if (score >= 8) return 'default';
-    if (score >= 6) return 'secondary';
+  const getScoreBadgeVariant = (score: number, isIndividual: boolean = false) => {
+    const threshold = isIndividual ? 8 : 12; // 8/10 for individual, 12/15 for total
+    const midThreshold = isIndividual ? 6 : 9;
+
+    if (score >= threshold) return 'default';
+    if (score >= midThreshold) return 'secondary';
     return 'destructive';
   };
 
@@ -122,7 +125,7 @@ const InterviewerDashboard: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4 text-center">
                     <div>
                       <div className={`text-2xl font-bold ${getScoreColor(selectedCandidate.score)}`}>
-                        {selectedCandidate.score.toFixed(1)}
+                        {selectedCandidate.score.toFixed(1)} / 15
                       </div>
                       <div className="text-xs text-muted-foreground">Overall Score</div>
                     </div>
@@ -189,7 +192,7 @@ const InterviewerDashboard: React.FC = () => {
                           <Badge variant="outline" className="capitalize">
                             {answer.difficulty}
                           </Badge>
-                          <Badge variant={getScoreBadgeVariant(answer.aiScore)}>
+                          <Badge variant={getScoreBadgeVariant(answer.aiScore, true)}>
                             {answer.aiScore}/10
                           </Badge>
                         </div>
@@ -435,7 +438,7 @@ const InterviewerDashboard: React.FC = () => {
                       
                       <div className="text-right">
                         <div className={`text-3xl font-bold ${getScoreColor(candidate.score)}`}>
-                          {candidate.score.toFixed(1)}
+                          {candidate.score.toFixed(1)} / 15
                         </div>
                         <div className="text-sm text-muted-foreground">
                           {formatDuration(candidate.startTime, candidate.endTime)}

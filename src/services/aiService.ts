@@ -38,43 +38,38 @@ export class AIService {
     }
   }
 
-  async generateQuestion(difficulty: 'easy' | 'medium' | 'hard', previousQuestions: string[] = []): Promise<InterviewQuestion & { options: string[] }> {
+  async generateInterviewQuestions(): Promise<InterviewQuestion[]> {
     const timeMap = {
       easy: 20,
       medium: 60,
-      hard: 120
+      hard: 120,
     };
-
-    const difficultyContext = {
-      easy: 'basic concepts, simple coding problems, or fundamental knowledge',
-      medium: 'intermediate concepts, moderate coding challenges, or problem-solving scenarios',
-      hard: 'advanced concepts, complex algorithms, system design, or challenging technical problems'
-    };
-
-    const previousQuestionsText = previousQuestions.length > 0 
-      ? `\n\nPrevious questions asked (do not repeat these):\n${previousQuestions.join('\n')}`
-      : '';
 
     const prompt = `
-      Generate a ${difficulty} level MULTIPLE CHOICE interview question for a Full Stack Developer position (React/Node.js).
+      Generate a complete set of 6 MULTIPLE CHOICE interview questions for a Full Stack Developer position (React/Node.js).
       
-      The question should focus on ${difficultyContext[difficulty]}.
+      The set MUST contain exactly:
+      - 2 'easy' level questions
+      - 2 'medium' level questions
+      - 2 'hard' level questions
+
+      Requirements for each question:
+      - Be specific, technical, and unique.
+      - Focus on practical knowledge and problem-solving.
+      - Include exactly 4 multiple choice options.
+      - Only ONE option should be correct.
       
-      Requirements:
-      - Be specific and technical
-      - Be appropriate for a ${difficulty} level candidate
-      - Focus on practical knowledge and problem-solving
-      - Include exactly 4 multiple choice options (A, B, C, D)
-      - Only ONE option should be correct
-      - Should be answerable in ${timeMap[difficulty]} seconds
-      
-      ${previousQuestionsText}
-      
-      Return your response in this exact JSON format:
+      Return your response as a single JSON object with a "questions" key, which is an array of 6 question objects.
+      Do not include any other text or markdown in your response.
+
+      Each object in the array must have this exact format:
       {
+        "difficulty": "easy" | "medium" | "hard",
         "question": "[The question text]",
         "options": ["A) [Option A]", "B) [Option B]", "C) [Option C]", "D) [Option D]"]
       }
+
+      To ensure variety, use this random seed in your generation process: ${Math.random()}
     `;
 
     try {
@@ -85,41 +80,28 @@ export class AIService {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          question: parsed.question,
-          difficulty,
-          timeLimit: timeMap[difficulty],
-          options: parsed.options
-        };
+        if (parsed.questions && parsed.questions.length === 6) {
+          return parsed.questions.map((q: any) => ({
+            ...q,
+            id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            question: q.question.replace(/\*\*/g, ''), // Clean markdown
+            timeLimit: timeMap[q.difficulty as 'easy' | 'medium' | 'hard'],
+          }));
+        }
       }
       
-      throw new Error('Invalid response format');
+      throw new Error('Invalid or incomplete response format from AI');
     } catch (error) {
-      console.error('Error generating question:', error);
-      // Fallback MCQ questions
-      const fallbackQuestions = {
-        easy: {
-          question: "Which of the following is the correct way to declare a constant in JavaScript?",
-          options: ["A) var x = 5;", "B) let x = 5;", "C) const x = 5;", "D) constant x = 5;"]
-        },
-        medium: {
-          question: "What is the primary purpose of React hooks?",
-          options: ["A) To manage component styling", "B) To enable state and lifecycle features in functional components", "C) To handle API requests", "D) To optimize performance"]
-        },
-        hard: {
-          question: "Which pattern is most suitable for handling real-time data synchronization in a distributed system?",
-          options: ["A) Event Sourcing", "B) CQRS", "C) Event-driven architecture with message queues", "D) All of the above"]
-        }
-      };
-      
-      return {
-        id: `fallback_${Date.now()}`,
-        question: fallbackQuestions[difficulty].question,
-        difficulty,
-        timeLimit: timeMap[difficulty],
-        options: fallbackQuestions[difficulty].options
-      };
+      console.error('Error generating interview questions:', error);
+      // In case of an API error, return a hardcoded fallback set of questions
+      return [
+        { id: 'fb_1', difficulty: 'easy', question: 'What does `useState` return in React?', options: ['A) A value and a function', 'B) An object', 'C) An array', 'D) A string'], timeLimit: 20 },
+        { id: 'fb_2', difficulty: 'easy', question: 'Which of these is a valid Node.js module for handling file paths?', options: ['A) fs', 'B) path', 'C) http', 'D) url'], timeLimit: 20 },
+        { id: 'fb_3', difficulty: 'medium', question: 'What is the purpose of the `useEffect` hook in React?', options: ['A) To fetch data', 'B) To perform side effects', 'C) To manage state', 'D) To create context'], timeLimit: 60 },
+        { id: 'fb_4', difficulty: 'medium', question: 'What is middleware in the context of Express.js?', options: ['A) A database driver', 'B) A templating engine', 'C) A function with access to req and res objects', 'D) A client-side library'], timeLimit: 60 },
+        { id: 'fb_5', difficulty: 'hard', question: 'How would you optimize a React application that is rendering slowly?', options: ['A) Using `React.memo` and `useCallback`', 'B) Code splitting', 'C) Virtualizing long lists', 'D) All of the above'], timeLimit: 120 },
+        { id: 'fb_6', difficulty: 'hard', question: 'Describe the Node.js event loop.', options: ['A) A single-threaded, non-blocking I/O model', 'B) A multi-threaded process for handling requests', 'C) A browser-based API', 'D) A way to manage global variables'], timeLimit: 120 },
+      ];
     }
   }
 
