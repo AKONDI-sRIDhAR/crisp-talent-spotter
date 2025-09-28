@@ -36,7 +36,7 @@ const InterviewChat: React.FC = () => {
     submitAnswer,
     nextQuestion,
     finishInterview,
-    updateCandidate
+    apiKey
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -85,8 +85,8 @@ const InterviewChat: React.FC = () => {
       const difficulty = difficulties[latestCandidate.currentQuestionIndex];
       
       const previousQuestions = latestCandidate.answers.map(a => a.question);
-      // Calls the dynamic AI service method
-      const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
+      // Calls the dynamic AI service method, which now handles the fallback internally
+      const questionData = await aiService.generateQuestion(difficulty, previousQuestions, apiKey);
       
       setCurrentQuestion(questionData);
       setTimeRemaining(questionData.timeLimit);
@@ -104,10 +104,11 @@ const InterviewChat: React.FC = () => {
       setTimerActive(true);
     } catch (error) {
       console.error('Error generating question:', error);
+      // The service now handles fallbacks, so this error is for unexpected issues.
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
         type: 'ai',
-        content: 'I apologize, but there was an error generating the next question. Please try refreshing the page.',
+        content: `I apologize, but an unexpected error occurred. Please try refreshing the page.`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -218,7 +219,8 @@ const InterviewChat: React.FC = () => {
         const { score, comment } = await aiService.scoreAnswer(
           answer.question,
           answer.answer,
-          answer.difficulty
+          answer.difficulty,
+          apiKey
         );
         
         const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
@@ -235,7 +237,8 @@ const InterviewChat: React.FC = () => {
 
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
-        latestCandidate.name
+        latestCandidate.name,
+        apiKey
       );
 
       const finalCandidate: Candidate = {
@@ -247,11 +250,14 @@ const InterviewChat: React.FC = () => {
         endTime: new Date()
       };
 
+      const finalMessageContent = apiKey && summary && !summary.includes('disabled')
+        ? `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`
+        : `🎉 **Interview Complete!**\n\nThank you for taking the interview, ${latestCandidate.name}! Your responses have been saved.`;
+
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        // Merged the content, keeping the bolder formatting from 'main'
-        content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
+        content: finalMessageContent,
         timestamp: new Date()
       };
 
@@ -263,9 +269,13 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      
-      // Kept the cleaned-up error handling logic
-      const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
+      const candidateOnError = {
+        ...latestCandidate,
+        status: 'completed' as const,
+        endTime: new Date(),
+        aiSummary: 'An error occurred during the final analysis.',
+        score: 0,
+      };
       finishInterview(candidateOnError); 
       
     } finally {
