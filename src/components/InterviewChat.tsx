@@ -84,7 +84,14 @@ const InterviewChat: React.FC = () => {
 
     if (!latestCandidate) return;
 
-    // The check for interview completion is now in handleSubmitAnswer
+    const questionIndex = latestCandidate.currentQuestionIndex;
+
+
+    if (questionIndex >= 6) {
+      await finishInterviewProcess();
+      return;
+    }
+
 
     setIsLoading(true);
 
@@ -102,6 +109,8 @@ const InterviewChat: React.FC = () => {
         id: `question-${latestCandidate.currentQuestionIndex}`,
         type: 'ai',
         content: `Question ${latestCandidate.currentQuestionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
+
+        content: `Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
         timestamp: new Date(),
         isQuestion: true,
         options: questionData.options
@@ -219,6 +228,11 @@ const InterviewChat: React.FC = () => {
 
       const finalCandidate: Candidate = {
         ...latestCandidate,
+
+
+
+        ...currentCandidate,
+
         answers: scoredAnswers,
         score: finalTotalScore,
         aiSummary: summary,
@@ -230,6 +244,10 @@ const InterviewChat: React.FC = () => {
         id: 'final',
         type: 'ai',
         content: `🎉 Interview Complete!\n\nFinal Score: ${finalTotalScore.toFixed(1)}/15\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
+
+
+        content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
+
         timestamp: new Date()
       };
 
@@ -241,9 +259,13 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      // Even on error, we should try to finish the interview with available data
+     
+
+
       const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
-      finishInterview(candidateOnError);
+      finishInterview(candidateOnError):
+      const errorCandidate = { ...currentCandidate, status: 'completed' as const, endTime: new Date() };
+      finishInterview(errorCandidate);
     } finally {
       setIsLoading(false);
     }
