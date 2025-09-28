@@ -35,13 +35,13 @@ const IntervieweePage: React.FC = () => {
     }
   }, [currentCandidate]);
 
-  const handleResumeComplete = () => {
+  const handleResumeComplete = (data: { name: string; email: string; phone: string }) => {
     // Create a new candidate
     const candidate: Candidate = {
       id: `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: extractedData.name || 'Unknown',
-      email: extractedData.email || 'unknown@email.com',
-      phone: extractedData.phone || 'Unknown',
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
       score: 0,
       status: 'in-progress',
       startTime: new Date(),

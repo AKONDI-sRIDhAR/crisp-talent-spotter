@@ -204,13 +204,14 @@ const InterviewChat: React.FC = () => {
         currentCandidate.name
       );
 
-      updateCandidate(currentCandidate.id, {
+      const finalCandidate: Candidate = {
+        ...currentCandidate,
         answers: scoredAnswers,
         score: Math.round(averageScore * 10) / 10,
         aiSummary: summary,
         status: 'completed',
         endTime: new Date()
-      });
+      };
 
       const finalMessage: Message = {
         id: 'final',
@@ -222,12 +223,14 @@ const InterviewChat: React.FC = () => {
       setMessages(prev => [...prev, finalMessage]);
       
       setTimeout(() => {
-        finishInterview();
+        finishInterview(finalCandidate);
       }, 5000);
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      finishInterview();
+      // Even on error, we should try to finish the interview with available data
+      const errorCandidate = { ...currentCandidate, status: 'completed' as const, endTime: new Date() };
+      finishInterview(errorCandidate);
     } finally {
       setIsLoading(false);
     }
