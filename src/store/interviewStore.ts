@@ -9,6 +9,7 @@ export interface Candidate {
   resumeText?: string;
   resumeFile?: File;
   resumeDataUrl?: string;
+  resumeSummary?: string | null;
   score: number;
   status: 'pending' | 'in-progress' | 'completed';
   startTime?: Date;
@@ -66,6 +67,19 @@ interface InterviewStore {
   nextQuestion: () => void;
   finishInterview: (finalCandidate: Candidate) => void;
 
+  // API Key Management (Added for security/functionality)
+  apiKey: string | null;
+  setApiKey: (key: string | null) => void;
+
+  // Resume data extraction
+  extractedData: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    summary?: string | null;
+  };
+  setExtractedData: (data: { name?: string; email?: string; phone?: string, summary?: string | null }) => void;
+
   // For cycling through pre-generated question sets
   questionSetIndex: number;
   incrementQuestionSetIndex: () => void;
@@ -101,6 +115,14 @@ export const useInterviewStore = create<InterviewStore>()(
 
       timeRemaining: 0,
       setTimeRemaining: (time) => set({ timeRemaining: time }),
+
+      // API Key Management
+      apiKey: null,
+      setApiKey: (key) => set({ apiKey: key }),
+
+      // Resume Data Management
+      extractedData: {},
+      setExtractedData: (data) => set({ extractedData: data }),
 
       submitAnswer: (answer, timeUsed) => {
         const state = get();
@@ -171,6 +193,8 @@ export const useInterviewStore = create<InterviewStore>()(
       partialize: (state) => ({
         candidates: state.candidates,
         currentCandidate: state.currentCandidate,
+        extractedData: state.extractedData, // Ensure extracted data is persisted
+        apiKey: state.apiKey, // Ensure API key is persisted
         questionSetIndex: state.questionSetIndex,
       }),
     }
