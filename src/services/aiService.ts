@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
-// NOTE: The external import for staticQuestions is removed to resolve the build error.
+// NOTE: The external import for staticQuestions is removed and the function is defined locally.
 
 // --- Local Fallback Implementation ---
 /**
@@ -111,103 +111,127 @@ const getStaticQuestion = (
 // ------------------------------------
 
 export class AIService {
-  private apiKey: string | null = import.meta.env.VITE_GEMINI_API_KEY || null;
-
+  
   // Method to instantiate the model for a specific API key
-  private getModel() {
-    if (!this.apiKey) {
-      throw new Error("API Key not found. Please set VITE_GEMINI_API_KEY in your environment.");
-    }
-    const genAI = new GoogleGenerativeAI(this.apiKey);
+  private getModel(apiKey: string) {
+    const genAI = new GoogleGenerativeAI(apiKey);
     return genAI.getGenerativeModel({ model: 'gemini-pro' });
+  }
+
+  // --- Resume Extraction ---
+  async extractResumeData(resumeText: string, apiKey: string) {
+    // RESOLUTION: Unified API key check
+    if (!apiKey) return { name: null, email: null, phone: null, summary: null };
+    if (!resumeText) return { name: null, email: null, phone: null, summary: null };
+
+    const prompt = `
+      Extract the following information from this resume text. Return ONLY a JSON object with these exact keys:
+      - name: candidate's full name
+      - email: email address
+      - phone: phone number
+      - summary: A concise 2-3 sentence summary of the candidate's professional experience and skills.
+      
+      If any field is not found, use null as the value.
+      
+      Resume text:
+      ${resumeText}
+    `;
+
+    try {
+      const model = this.getModel(apiKey);
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      
+      console.warn('AI could not extract resume data into a valid JSON.');
+      return { name: null, email: null, phone: null, summary: null };
+    } catch (error) {
+      console.error('Error extracting resume data:', error);
+      return { name: null, email: null, phone: null, summary: null };
+    }
   }
 
   // --- Question Generation ---
   async generateQuestion(
     difficulty: 'easy' | 'medium' | 'hard',
-    previousQuestions: string[]
+    previousQuestions: string[],
+    apiKey: string | null | undefined
   ): Promise<InterviewQuestion> {
     const timeMap = { easy: 20, medium: 60, hard: 120 };
 
-    if (!this.apiKey) {
+    // Fallback if no API key is provided
+    if (!apiKey) {
       return getStaticQuestion(difficulty, previousQuestions);
     }
 
-    const MAX_RETRIES = 3;
-    for (let i = 0; i < MAX_RETRIES; i++) {
-      try {
-        const difficultyContext = {
-          easy: 'basic concepts, simple coding problems, or fundamental knowledge',
-          medium: 'intermediate concepts, moderate coding challenges, or problem-solving scenarios',
-          hard: 'advanced concepts, complex algorithms, system design, or challenging technical problems'
-        };
+    const difficultyContext = {
+      easy: 'basic concepts, simple coding problems, or fundamental knowledge',
+      medium: 'intermediate concepts, moderate coding challenges, or problem-solving scenarios',
+      hard: 'advanced concepts, complex algorithms, system design, or challenging technical problems'
+    };
 
-        const previousQuestionsText = previousQuestions.length > 0
-          ? `\n\nCRITICAL: Do NOT repeat any of these previous questions:\n- ${previousQuestions.join('\n- ')}`
-          : '';
+    const previousQuestionsText = previousQuestions.length > 0
+      ? `\n\nCRITICAL: Do NOT repeat any of these previous questions:\n- ${previousQuestions.join('\n- ')}`
+      : '';
 
-        const prompt = `
-          You are an AI interviewer for a Full Stack Developer position (React/Node.js).
-          Generate a single, unique, ${difficulty} level MULTIPLE CHOICE interview question.
-          The question should test the candidate's knowledge of ${difficultyContext[difficulty]}.
+    // Merged prompt for dynamic question generation
+    const prompt = `
+      You are an AI interviewer for a Full Stack Developer position (React/Node.js).
+      Generate a single, unique, ${difficulty} level MULTIPLE CHOICE interview question.
+      The question should test the candidate's knowledge of ${difficultyContext[difficulty]}.
+      
+      Requirements:
+      - The question must be specific, technical, and distinct from common examples.
+      - Provide exactly 4 multiple choice options.
+      - Only ONE option can be correct.
+      ${previousQuestionsText}
 
-          Requirements:
-          - The question must be specific, technical, and distinct from common examples.
-          - Provide exactly 4 multiple choice options.
-          - Only ONE option can be correct.
-          ${previousQuestionsText}
+      Return your response as a single, clean JSON object. Do not include any other text, markdown, or explanations.
 
-          Return your response as a single, clean JSON object. Do not include any other text, markdown, or explanations.
-
-          The object MUST have this exact format:
-          {
-            "question": "[The question text]",
-            "options": ["A) [Option A]", "B) [Option B]", "C) [Option C]", "D) [Option D]"]
-          }
-
-          To ensure variety for different users, use this unique seed in your generation process: ${Date.now()}-${Math.random()}
-        `;
-
-        const model = this.getModel();
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          const cleanQuestion = parsed.question.replace(/\*\*/g, '');
-
-          if (!previousQuestions.includes(cleanQuestion)) {
-            return {
-              id: `q_${Date.now()}`,
-              question: cleanQuestion,
-              difficulty,
-              timeLimit: timeMap[difficulty],
-              options: parsed.options,
-            };
-          } else {
-            console.warn(`AI generated a duplicate question. Retrying... (${i + 1}/${MAX_RETRIES})`);
-          }
-        } else {
-          throw new Error('Invalid or incomplete response format from AI.');
-        }
-      } catch (error) {
-        console.error(`Error generating dynamic question on attempt ${i + 1}:`, error);
-        if (i === MAX_RETRIES - 1) {
-          console.error('Max retries reached. Falling back to static question.');
-          return getStaticQuestion(difficulty, previousQuestions);
-        }
+      The object MUST have this exact format:
+      {
+        "question": "[The question text]",
+        "options": ["A) [Option A]", "B) [Option B]", "C) [Option C]", "D) [Option D]"]
       }
-    }
 
-    console.error(`Failed to generate a unique question after ${MAX_RETRIES} attempts.`);
-    return getStaticQuestion(difficulty, previousQuestions);
+      To ensure variety for different users, use this unique seed in your generation process: ${Date.now()}-${Math.random()}
+    `;
+
+    try {
+      const model = this.getModel(apiKey);
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        
+        const cleanQuestion = parsed.question.replace(/\*\*/g, '');
+        return {
+          id: `q_${Date.now()}`,
+          question: cleanQuestion,
+          difficulty,
+          timeLimit: timeMap[difficulty],
+          options: parsed.options
+        };
+      }
+      throw new Error('Invalid or incomplete response format from AI for question generation.');
+    } catch (error) {
+      console.error('Error generating dynamic question, falling back to static:', error);
+      // Fallback to static question list when AI call fails
+      return getStaticQuestion(difficulty, previousQuestions);
+    }
   }
 
   // --- Answer Scoring ---
-  async scoreAnswer(question: string, answer: string, difficulty: 'easy' | 'medium' | 'hard'): Promise<{ score: number; comment: string }> {
-    if (!this.apiKey) {
+  async scoreAnswer(question: string, answer: string, difficulty: 'easy' | 'medium' | 'hard', apiKey: string): Promise<{ score: number; comment: string }> {
+    if (!apiKey) {
       return { score: 0, comment: 'AI scoring is disabled. Please set an API key.' };
     }
 
@@ -236,7 +260,7 @@ export class AIService {
     // Implemented retry mechanism for increased scoring reliability
     for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-            const model = this.getModel();
+            const model = this.getModel(apiKey);
             const result = await model.generateContent(prompt);
             const response = await result.response;
             const text = response.text();
@@ -267,63 +291,61 @@ export class AIService {
   }
 
   // --- Final Summary Generation ---
-  async generateFinalSummary(
-    answers: InterviewAnswer[],
-    candidateName: string
-  ): Promise<{ summary: string; overallScore: number }> {
+  async generateFinalSummary(answers: InterviewAnswer[], candidateName: string, resumeSummary: string | null, apiKey: string): Promise<{ summary: string; overallScore: number }> {
+    // Safely calculate total score, accounting for potentially missing scores
     const totalScore = answers.reduce((sum, answer) => sum + (answer.aiScore || 0), 0);
     const averageScore = answers.length > 0 ? totalScore / answers.length : 0;
-    const overallScore = Math.round(averageScore * 10) / 10;
 
-    if (!this.apiKey) {
+    if (!apiKey) {
       return {
-        summary: `The interview for ${candidateName} is complete. AI summary generation is disabled as the API key is not configured.`,
-        overallScore: overallScore,
+        summary: 'AI summary is disabled. Please set an API key to enable this feature.',
+        overallScore: 0
       };
     }
+    
+    const answersText = answers.map((answer, index) => 
+      `Question ${index + 1} (${answer.difficulty}): ${answer.question}\nAnswer: ${answer.answer}\nScore: ${answer.aiScore}/10\n`
+    ).join('\n');
 
-    const answersText = answers
-      .map(
-        (answer, index) =>
-          `Question ${index + 1} (${answer.difficulty}): ${
-            answer.question
-          }\nAnswer: ${answer.answer}\nScore: ${answer.aiScore}/10\n`
-      )
-      .join('\n');
+    const resumeContext = resumeSummary
+      ? `\n**Candidate's Resume Summary:**\n${resumeSummary}\n`
+      : '';
 
+    // Merged prompt for a robust, concise summary
     const prompt = `
       As an AI hiring assistant, generate a professional interview summary for a candidate named ${candidateName}.
-      The summary should be concise (3-4 sentences) and cover the following points based on the provided interview data:
-      1.  An overall assessment of the candidate's performance.
-      2.  Mention one key strength.
-      3.  Mention one area for improvement.
+      The summary should be concise (3-4 sentences) and cover the following points based on the provided interview data and resume summary:
+      1.  An overall assessment of the candidate's performance, considering both their interview answers and resume.
+      2.  Mention one key strength, drawing from either the interview or resume.
+      3.  Mention one area for improvement based on the interview.
       4.  Provide a final hiring recommendation (e.g., "Strong Hire", "Good Candidate", "Needs Improvement").
 
-      Here is the interview data:
+      ${resumeContext}
+      **Interview Performance:**
       ${answersText}
       
       Return ONLY the summary text. Do not use markdown or JSON formatting.
     `;
 
     try {
-      const model = this.getModel();
+      const model = this.getModel(apiKey);
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const summary = response.text().trim();
 
       if (!summary) {
-        throw new Error("AI returned an empty summary.");
+          throw new Error("AI returned an empty summary.");
       }
 
       return {
         summary,
-        overallScore: overallScore,
+        overallScore: Math.round(averageScore * 10) / 10
       };
     } catch (error) {
       console.error('Error generating summary:', error);
       return {
         summary: `${candidateName} completed the interview. The AI summary could not be generated due to an error.`,
-        overallScore: overallScore,
+        overallScore: averageScore
       };
     }
   }
