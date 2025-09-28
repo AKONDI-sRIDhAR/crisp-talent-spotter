@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
 // FIX: Removed the faulty import: import { getStaticQuestion } from '../lib/staticQuestions';
 
+<<<<<<< HEAD
 /**
  * Fallback function to return a static question when the API key is missing or the AI call fails.
  * This is a temporary local implementation to fix the 'Failed to resolve import' error.
@@ -49,6 +50,8 @@ const getStaticQuestion = (
   };
 };
 
+=======
+>>>>>>> aac6367948c6e2c83fa378f3d6944997356eb084
 export class AIService {
   
   // Method to instantiate the model for a specific API key
@@ -191,7 +194,7 @@ export class AIService {
       }
     `;
 
-    // RESOLUTION: Implemented retry mechanism for increased scoring reliability
+    // Implemented retry mechanism for increased scoring reliability
     for (let attempt = 1; attempt <= 2; attempt++) {
         try {
             const model = this.getModel(apiKey);
@@ -215,7 +218,7 @@ export class AIService {
                 // If the second attempt also fails, return an error.
                 return { score: 0, comment: 'An error occurred during AI scoring after multiple attempts.' };
             }
-            // Optional: wait a moment before retrying (exponential backoff not strictly required here, simple delay suffices)
+            // Optional: wait a moment before retrying
             await new Promise(res => setTimeout(res, 500));
         }
     }

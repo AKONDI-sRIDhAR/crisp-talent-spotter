@@ -6,16 +6,14 @@ import ResumeUpload from './ResumeUpload';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
-// NOTE: questionSets import is no longer strictly necessary if questions are dynamically generated,
-// but kept for now as it's part of the original context.
-import { questionSets } from '@/lib/preGeneratedQuestions';
+// NOTE: import { questionSets } from '@/lib/preGeneratedQuestions'; is removed, as questions are generated dynamically.
 
 type NewCandidateData = {
   name: string;
   email: string;
   phone: string;
   resumeText: string;
-  resumeDataUrl: string; // Included from previous merge resolution
+  resumeDataUrl: string; // The correct, merged type definition
 };
 
 const IntervieweePage: React.FC = () => {
@@ -31,8 +29,8 @@ const IntervieweePage: React.FC = () => {
     addCandidate,
     updateCandidate,
     setCurrentMode,
-    questionSetIndex,
-    incrementQuestionSetIndex,
+    questionSetIndex, // Kept for minimal change, though unused in dynamic flow
+    incrementQuestionSetIndex, // Kept for minimal change, though unused in dynamic flow
   } = useInterviewStore();
 
   useEffect(() => {
@@ -43,10 +41,6 @@ const IntervieweePage: React.FC = () => {
   }, [currentCandidate]);
 
   const startNewInterview = (data: NewCandidateData) => {
-    // NOTE: Questions are generated dynamically by InterviewChat using the AI service.
-    // The questionSetIndex state and increment are currently unused in the dynamic flow, 
-    // but kept in the destructured props for minimal change.
-    
     // Create a new candidate
     const newCandidate: Candidate = {
       id: `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -54,7 +48,7 @@ const IntervieweePage: React.FC = () => {
       email: data.email,
       phone: data.phone,
       resumeText: data.resumeText,
-      resumeDataUrl: data.resumeDataUrl, // Included from previous merge resolution
+      resumeDataUrl: data.resumeDataUrl, // Correctly assigns the data URL
       score: 0,
       status: 'in-progress',
       startTime: new Date(),
@@ -70,7 +64,6 @@ const IntervieweePage: React.FC = () => {
 
     addCandidate(newCandidate);
     setCurrentCandidate(newCandidate);
-    // incrementQuestionSetIndex(); // Disabled as we are not cycling pre-generated sets
     setStep('interview');
   };
 
