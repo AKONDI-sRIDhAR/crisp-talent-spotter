@@ -79,9 +79,12 @@ const InterviewChat: React.FC = () => {
   }, [currentCandidate]);
 
   const generateNextQuestion = async () => {
-    if (!currentCandidate) return;
+    // Get the LATEST state directly from the store to prevent stale closures
+    const latestCandidate = useInterviewStore.getState().currentCandidate;
 
-    const questionIndex = currentCandidate.currentQuestionIndex;
+    if (!latestCandidate) return;
+
+    const questionIndex = latestCandidate.currentQuestionIndex;
     if (questionIndex >= 6) {
       await finishInterviewProcess();
       return;
@@ -93,7 +96,7 @@ const InterviewChat: React.FC = () => {
       const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
       const difficulty = difficulties[questionIndex];
       
-      const previousQuestions = currentCandidate.answers.map(a => a.question);
+      const previousQuestions = latestCandidate.answers.map(a => a.question);
       const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
       
       setCurrentQuestion(questionData);
@@ -171,7 +174,8 @@ const InterviewChat: React.FC = () => {
   };
 
   const finishInterviewProcess = async () => {
-    if (!currentCandidate) return;
+    const latestCandidate = useInterviewStore.getState().currentCandidate;
+    if (!latestCandidate) return;
 
     setIsLoading(true);
 
@@ -186,7 +190,7 @@ const InterviewChat: React.FC = () => {
       const scoredAnswers = [];
       let finalTotalScore = 0;
 
-      for (const answer of currentCandidate.answers) {
+      for (const answer of latestCandidate.answers) {
         const { score, comment } = await aiService.scoreAnswer(
           answer.question,
           answer.answer,
@@ -207,10 +211,11 @@ const InterviewChat: React.FC = () => {
 
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
-        currentCandidate.name
+        latestCandidate.name
       );
 
       const finalCandidate: Candidate = {
+        ...latestCandidate,
         ...currentCandidate,
         answers: scoredAnswers,
         score: finalTotalScore,
@@ -222,7 +227,7 @@ const InterviewChat: React.FC = () => {
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${currentCandidate.name}!`,
+        content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
         timestamp: new Date()
       };
 
@@ -234,7 +239,7 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      // Even on error, we should try to finish the interview with available data
+     
       const errorCandidate = { ...currentCandidate, status: 'completed' as const, endTime: new Date() };
       finishInterview(errorCandidate);
     } finally {
