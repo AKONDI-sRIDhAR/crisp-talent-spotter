@@ -38,7 +38,7 @@ export class AIService {
     }
   }
 
-  async generateQuestion(difficulty: 'easy' | 'medium' | 'hard', previousQuestions: string[] = []): Promise<InterviewQuestion> {
+  async generateQuestion(difficulty: 'easy' | 'medium' | 'hard', previousQuestions: string[] = []): Promise<InterviewQuestion & { options: string[] }> {
     const timeMap = {
       easy: 20,
       medium: 60,
@@ -56,7 +56,7 @@ export class AIService {
       : '';
 
     const prompt = `
-      Generate a ${difficulty} level interview question for a Full Stack Developer position (React/Node.js).
+      Generate a ${difficulty} level MULTIPLE CHOICE interview question for a Full Stack Developer position (React/Node.js).
       
       The question should focus on ${difficultyContext[difficulty]}.
       
@@ -64,39 +64,61 @@ export class AIService {
       - Be specific and technical
       - Be appropriate for a ${difficulty} level candidate
       - Focus on practical knowledge and problem-solving
-      - Can include coding scenarios, system design, or theoretical concepts
+      - Include exactly 4 multiple choice options (A, B, C, D)
+      - Only ONE option should be correct
       - Should be answerable in ${timeMap[difficulty]} seconds
       
       ${previousQuestionsText}
       
-      Return ONLY the question text, no additional formatting or explanation.
+      Return your response in this exact JSON format:
+      {
+        "question": "[The question text]",
+        "options": ["A) [Option A]", "B) [Option B]", "C) [Option C]", "D) [Option D]"]
+      }
     `;
 
     try {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
-      const questionText = response.text().trim();
-
-      return {
-        id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        question: questionText,
-        difficulty,
-        timeLimit: timeMap[difficulty]
-      };
+      const text = response.text();
+      
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          question: parsed.question,
+          difficulty,
+          timeLimit: timeMap[difficulty],
+          options: parsed.options
+        };
+      }
+      
+      throw new Error('Invalid response format');
     } catch (error) {
       console.error('Error generating question:', error);
-      // Fallback questions
+      // Fallback MCQ questions
       const fallbackQuestions = {
-        easy: "Explain the difference between let, const, and var in JavaScript.",
-        medium: "How would you implement user authentication in a React application?",
-        hard: "Design a scalable system architecture for a real-time chat application with millions of users."
+        easy: {
+          question: "Which of the following is the correct way to declare a constant in JavaScript?",
+          options: ["A) var x = 5;", "B) let x = 5;", "C) const x = 5;", "D) constant x = 5;"]
+        },
+        medium: {
+          question: "What is the primary purpose of React hooks?",
+          options: ["A) To manage component styling", "B) To enable state and lifecycle features in functional components", "C) To handle API requests", "D) To optimize performance"]
+        },
+        hard: {
+          question: "Which pattern is most suitable for handling real-time data synchronization in a distributed system?",
+          options: ["A) Event Sourcing", "B) CQRS", "C) Event-driven architecture with message queues", "D) All of the above"]
+        }
       };
       
       return {
         id: `fallback_${Date.now()}`,
-        question: fallbackQuestions[difficulty],
+        question: fallbackQuestions[difficulty].question,
         difficulty,
-        timeLimit: timeMap[difficulty]
+        timeLimit: timeMap[difficulty],
+        options: fallbackQuestions[difficulty].options
       };
     }
   }

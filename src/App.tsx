@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import LandingPage from './components/LandingPage';
 import IntervieweePage from './components/IntervieweePage';
 import InterviewerDashboard from './components/InterviewerDashboard';
+import InterviewerLogin from './components/InterviewerLogin';
 import WelcomeBackModal from './components/WelcomeBackModal';
 import { useInterviewStore } from './store/interviewStore';
 
@@ -14,6 +15,7 @@ const queryClient = new QueryClient();
 const App = () => {
   const { 
     currentMode, 
+    setCurrentMode,
     currentCandidate, 
     setShowWelcomeBack,
     showWelcomeBack 
@@ -33,6 +35,13 @@ const App = () => {
     switch (currentMode) {
       case 'interviewee':
         return <IntervieweePage />;
+      case 'interviewer-login':
+        return (
+          <InterviewerLogin
+            onLogin={() => setCurrentMode('interviewer')}
+            onBack={() => setCurrentMode('landing')}
+          />
+        );
       case 'interviewer':
         return <InterviewerDashboard />;
       default:

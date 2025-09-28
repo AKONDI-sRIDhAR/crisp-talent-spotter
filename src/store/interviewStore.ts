@@ -32,12 +32,13 @@ export interface InterviewQuestion {
   question: string;
   difficulty: 'easy' | 'medium' | 'hard';
   timeLimit: number;
+  options?: string[];
 }
 
 interface InterviewStore {
   // Current mode
-  currentMode: 'landing' | 'interviewee' | 'interviewer';
-  setCurrentMode: (mode: 'landing' | 'interviewee' | 'interviewer') => void;
+  currentMode: 'landing' | 'interviewee' | 'interviewer' | 'interviewer-login';
+  setCurrentMode: (mode: 'landing' | 'interviewee' | 'interviewer' | 'interviewer-login') => void;
 
   // Current candidate (for interviewee mode)
   currentCandidate: Candidate | null;
@@ -117,7 +118,7 @@ export const useInterviewStore = create<InterviewStore>()(
           timeLimit: state.currentQuestion.timeLimit,
           timeUsed,
           difficulty: state.currentQuestion.difficulty,
-          aiScore: 0, // Will be calculated by AI
+          aiScore: 0, // Will be calculated at the end
         };
 
         const updatedCandidate = {
@@ -129,6 +130,13 @@ export const useInterviewStore = create<InterviewStore>()(
           currentCandidate: updatedCandidate,
           timerActive: false,
         });
+
+        // Update candidates array
+        set((state) => ({
+          candidates: state.candidates.map(c => 
+            c.id === updatedCandidate.id ? updatedCandidate : c
+          )
+        }));
       },
 
       nextQuestion: () => {

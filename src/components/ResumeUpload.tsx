@@ -217,16 +217,19 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={manualData.phone}
-                  onChange={(e) => handleManualDataChange('phone', e.target.value)}
-                  placeholder="Enter your phone number"
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number *</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={manualData.phone}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9+\-\s\(\)]/g, '');
+                      handleManualDataChange('phone', value);
+                    }}
+                    placeholder="Enter your phone number"
+                  />
+                </div>
 
               {extractedData.name && (
                 <Alert>

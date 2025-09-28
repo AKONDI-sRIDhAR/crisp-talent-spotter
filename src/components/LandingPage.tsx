@@ -140,7 +140,7 @@ const LandingPage: React.FC = () => {
                 
                 <Button 
                   variant="outline"
-                  onClick={() => setCurrentMode('interviewer')}
+                  onClick={() => setCurrentMode('interviewer-login')}
                   className="w-full mt-6 border-accent/50 hover:bg-accent/10"
                   size="lg"
                 >

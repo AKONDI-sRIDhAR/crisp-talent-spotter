@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, ArrowLeft, Trophy, Clock, MessageSquare, User, Star, Filter } from 'lucide-react';
+import { Search, ArrowLeft, Trophy, Clock, MessageSquare, User, Star, Filter, FileText, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,12 +8,15 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
+import ResumeModal from './ResumeModal';
 
 const InterviewerDashboard: React.FC = () => {
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'score' | 'name' | 'date'>('score');
   const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'in-progress' | 'pending'>('all');
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const [resumeCandidate, setResumeCandidate] = useState<Candidate | null>(null);
 
   const { candidates, setCurrentMode } = useInterviewStore();
 
@@ -49,6 +52,11 @@ const InterviewerDashboard: React.FC = () => {
     if (score >= 8) return 'default';
     if (score >= 6) return 'secondary';
     return 'destructive';
+  };
+
+  const handleViewResume = (candidate: Candidate) => {
+    setResumeCandidate(candidate);
+    setShowResumeModal(true);
   };
 
   const formatDuration = (startTime?: Date, endTime?: Date) => {
@@ -100,6 +108,15 @@ const InterviewerDashboard: React.FC = () => {
                     <h3 className="font-semibold">{selectedCandidate.name}</h3>
                     <p className="text-sm text-muted-foreground">{selectedCandidate.email}</p>
                     <p className="text-sm text-muted-foreground">{selectedCandidate.phone}</p>
+                    <Button
+                      onClick={() => handleViewResume(selectedCandidate)}
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      View Resume
+                    </Button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 text-center">
@@ -220,6 +237,19 @@ const InterviewerDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Resume Modal */}
+        {resumeCandidate && (
+          <ResumeModal
+            isOpen={showResumeModal}
+            onClose={() => {
+              setShowResumeModal(false);
+              setResumeCandidate(null);
+            }}
+            candidateName={resumeCandidate.name}
+            resumeText={resumeCandidate.resumeText || 'No resume content available'}
+          />
+        )}
       </div>
     );
   }
@@ -419,6 +449,19 @@ const InterviewerDashboard: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Resume Modal */}
+      {resumeCandidate && (
+        <ResumeModal
+          isOpen={showResumeModal}
+          onClose={() => {
+            setShowResumeModal(false);
+            setResumeCandidate(null);
+          }}
+          candidateName={resumeCandidate.name}
+          resumeText={resumeCandidate.resumeText || 'No resume content available'}
+        />
+      )}
     </div>
   );
 };

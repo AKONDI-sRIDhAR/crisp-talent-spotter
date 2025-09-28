@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Bot, User, Trophy, CheckCircle2 } from 'lucide-react';
+import { Bot, User, Trophy, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import Timer from '@/components/ui/timer';
@@ -15,11 +14,13 @@ interface Message {
   type: 'ai' | 'user';
   content: string;
   timestamp: Date;
+  isQuestion?: boolean;
+  options?: string[];
 }
 
 const InterviewChat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [currentAnswer, setCurrentAnswer] = useState('');
+  const [selectedOption, setSelectedOption] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout>();
@@ -93,16 +94,18 @@ const InterviewChat: React.FC = () => {
       const difficulty = difficulties[questionIndex];
       
       const previousQuestions = currentCandidate.answers.map(a => a.question);
-      const question = await aiService.generateQuestion(difficulty, previousQuestions);
+      const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
       
-      setCurrentQuestion(question);
-      setTimeRemaining(question.timeLimit);
+      setCurrentQuestion(questionData);
+      setTimeRemaining(questionData.timeLimit);
       
       const questionMessage: Message = {
         id: `question-${questionIndex}`,
         type: 'ai',
-        content: `**Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${question.timeLimit}s)**\n\n${question.question}`,
-        timestamp: new Date()
+        content: `**Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)**\n\n${questionData.question}`,
+        timestamp: new Date(),
+        isQuestion: true,
+        options: questionData.options
       };
       
       setMessages(prev => [...prev, questionMessage]);
@@ -122,7 +125,7 @@ const InterviewChat: React.FC = () => {
   };
 
   const handleSubmitAnswer = async () => {
-    if (!currentAnswer.trim() || !currentQuestion || !currentCandidate) return;
+    if (!selectedOption || !currentQuestion || !currentCandidate) return;
 
     const timeUsed = currentQuestion.timeLimit - timeRemaining;
     
@@ -130,77 +133,39 @@ const InterviewChat: React.FC = () => {
     const userMessage: Message = {
       id: `answer-${Date.now()}`,
       type: 'user',
-      content: currentAnswer,
+      content: selectedOption,
       timestamp: new Date()
     };
     
     setMessages(prev => [...prev, userMessage]);
     setTimerActive(false);
-    setCurrentAnswer('');
+    setSelectedOption('');
     setIsLoading(true);
 
-    try {
-      // Score the answer
-      const { score, comment } = await aiService.scoreAnswer(
-        currentQuestion.question,
-        currentAnswer,
-        currentQuestion.difficulty
-      );
-
-      // Submit answer to store
-      submitAnswer(currentAnswer, timeUsed);
-      
-      // Update the candidate with AI score
-      if (currentCandidate) {
-        const updatedAnswers = [...currentCandidate.answers];
-        if (updatedAnswers.length > 0) {
-          updatedAnswers[updatedAnswers.length - 1] = {
-            ...updatedAnswers[updatedAnswers.length - 1],
-            aiScore: score,
-            aiComment: comment
-          };
-          updateCandidate(currentCandidate.id, { answers: updatedAnswers });
-        }
-      }
-
-      // Add AI feedback
-      const feedbackMessage: Message = {
-        id: `feedback-${Date.now()}`,
-        type: 'ai',
-        content: `**Score: ${score}/10**\n\n${comment}\n\nLet's move on to the next question!`,
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, feedbackMessage]);
-      
-      // Move to next question
-      nextQuestion();
-      setTimeout(() => {
-        generateNextQuestion();
-      }, 2000);
-
-    } catch (error) {
-      console.error('Error scoring answer:', error);
-      const errorMessage: Message = {
-        id: `error-${Date.now()}`,
-        type: 'ai',
-        content: 'I had trouble scoring your answer, but let\'s continue with the next question.',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-      
-      nextQuestion();
-      setTimeout(() => {
-        generateNextQuestion();
-      }, 1000);
-    } finally {
+    // Submit answer to store (no scoring here)
+    submitAnswer(selectedOption, timeUsed);
+    
+    // Add transition message
+    const transitionMessage: Message = {
+      id: `transition-${Date.now()}`,
+      type: 'ai',
+      content: 'Answer recorded! Moving to the next question...',
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, transitionMessage]);
+    
+    // Move to next question
+    nextQuestion();
+    setTimeout(() => {
+      generateNextQuestion();
       setIsLoading(false);
-    }
+    }, 1500);
   };
 
   const handleTimeUp = () => {
-    if (!currentAnswer.trim()) {
-      setCurrentAnswer('No answer provided due to time limit.');
+    if (!selectedOption) {
+      setSelectedOption('No answer selected due to time limit.');
     }
     handleSubmitAnswer();
   };
@@ -211,13 +176,37 @@ const InterviewChat: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const { summary, overallScore } = await aiService.generateFinalSummary(
-        currentCandidate.answers,
+      // Score all answers at the end
+      const scoredAnswers = [];
+      let totalScore = 0;
+
+      for (const answer of currentCandidate.answers) {
+        const { score, comment } = await aiService.scoreAnswer(
+          answer.question,
+          answer.answer,
+          answer.difficulty
+        );
+        
+        const scoredAnswer = {
+          ...answer,
+          aiScore: score,
+          aiComment: comment
+        };
+        
+        scoredAnswers.push(scoredAnswer);
+        totalScore += score;
+      }
+
+      const averageScore = scoredAnswers.length > 0 ? totalScore / scoredAnswers.length : 0;
+
+      const { summary } = await aiService.generateFinalSummary(
+        scoredAnswers,
         currentCandidate.name
       );
 
       updateCandidate(currentCandidate.id, {
-        score: overallScore,
+        answers: scoredAnswers,
+        score: Math.round(averageScore * 10) / 10,
         aiSummary: summary,
         status: 'completed',
         endTime: new Date()
@@ -226,7 +215,7 @@ const InterviewChat: React.FC = () => {
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        content: `🎉 **Interview Complete!**\n\n**Final Score: ${overallScore}/10**\n\n${summary}\n\nThank you for taking the interview, ${currentCandidate.name}!`,
+        content: `🎉 **Interview Complete!**\n\n**Final Score: ${Math.round(averageScore * 10) / 10}/10**\n\n${summary}\n\nThank you for taking the interview, ${currentCandidate.name}!`,
         timestamp: new Date()
       };
 
@@ -308,6 +297,26 @@ const InterviewChat: React.FC = () => {
                         <div className="whitespace-pre-wrap text-sm leading-relaxed">
                           {message.content}
                         </div>
+                        
+                        {/* MCQ Options */}
+                        {message.isQuestion && message.options && currentQuestion && timerActive && (
+                          <div className="mt-4 space-y-2">
+                            {message.options.map((option, index) => (
+                              <button
+                                key={index}
+                                onClick={() => setSelectedOption(option)}
+                                className={`w-full text-left p-3 rounded-lg border transition-all ${
+                                  selectedOption === option
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                                }`}
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        
                         <div className={`text-xs mt-2 ${
                           message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
                         }`}>
@@ -346,39 +355,19 @@ const InterviewChat: React.FC = () => {
         </div>
       </div>
 
-      {/* Answer Input */}
-      {currentQuestion && timerActive && (
+      {/* Submit Button */}
+      {currentQuestion && timerActive && selectedOption && (
         <div className="border-t bg-card/50 backdrop-blur-sm p-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <Textarea
-                  value={currentAnswer}
-                  onChange={(e) => setCurrentAnswer(e.target.value)}
-                  placeholder="Type your answer here..."
-                  className="min-h-[100px] resize-none"
-                  disabled={isLoading}
-                />
-                <div className="flex items-center justify-between mt-2">
-                  <Badge variant="outline" className="capitalize">
-                    {currentQuestion.difficulty} Level
-                  </Badge>
-                  <div className="text-sm text-muted-foreground">
-                    {currentAnswer.length} characters
-                  </div>
-                </div>
-              </div>
-              
-              <Button
-                onClick={handleSubmitAnswer}
-                disabled={!currentAnswer.trim() || isLoading}
-                size="lg"
-                className="h-auto py-4"
-              >
-                <Send className="w-4 h-4 mr-2" />
-                Submit
-              </Button>
-            </div>
+          <div className="max-w-4xl mx-auto flex justify-center">
+            <Button
+              onClick={handleSubmitAnswer}
+              disabled={!selectedOption || isLoading}
+              size="lg"
+              className="px-8"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              Submit Answer
+            </Button>
           </div>
         </div>
       )}

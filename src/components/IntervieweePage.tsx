@@ -14,10 +14,21 @@ const IntervieweePage: React.FC = () => {
     setCurrentCandidate,
     extractedData,
     addCandidate,
-    setCurrentMode
+    setCurrentMode,
+    setShowWelcomeBack
   } = useInterviewStore();
 
-  // Check if we have an existing candidate
+  // Check if we have an existing candidate and should show welcome back
+  useEffect(() => {
+    const storedData = localStorage.getItem('interview-store');
+    if (storedData) {
+      const parsed = JSON.parse(storedData);
+      if (parsed.state?.currentCandidate?.status === 'in-progress') {
+        setShowWelcomeBack(true);
+      }
+    }
+  }, [setShowWelcomeBack]);
+
   useEffect(() => {
     if (currentCandidate && currentCandidate.status !== 'completed') {
       setStep('interview');
