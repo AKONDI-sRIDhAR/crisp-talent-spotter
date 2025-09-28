@@ -86,6 +86,12 @@ const InterviewChat: React.FC = () => {
 
     const questionIndex = latestCandidate.currentQuestionIndex;
 
+    if (questionIndex >= 6) {
+      await finishInterviewProcess();
+      return;
+    }
+
+
     setIsLoading(true);
 
     try {
@@ -219,6 +225,9 @@ const InterviewChat: React.FC = () => {
 
       const finalCandidate: Candidate = {
         ...latestCandidate,
+
+        ...currentCandidate,
+
         answers: scoredAnswers,
         score: finalTotalScore,
         aiSummary: summary,
@@ -241,8 +250,12 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      // Even on error, we should try to finish the interview with available data
+
       const errorCandidate = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
+
+     
+      const errorCandidate = { ...currentCandidate, status: 'completed' as const, endTime: new Date() };
+
       finishInterview(errorCandidate);
     } finally {
       setIsLoading(false);
