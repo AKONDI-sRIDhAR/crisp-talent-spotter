@@ -2,7 +2,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
 import { getStaticQuestion } from '../lib/staticQuestions'; // Assumed dependency for the fallback logic
 
-// NOTE: Global/Vite environment setup is removed. The key is managed via function arguments.
+// NOTE: Hardcoded API key and global initialization (genAI) are removed.
+// The API key is managed via function arguments for security.
 
 export class AIService {
   
@@ -14,6 +15,7 @@ export class AIService {
 
   async extractResumeData(resumeText: string, apiKey: string) {
     if (!apiKey) return { name: null, email: null, phone: null };
+    if (!resumeText) return { name: null, email: null, phone: null };
 
     const prompt = `
       Extract the following information from this resume text. Return ONLY a JSON object with these exact keys:
@@ -38,6 +40,7 @@ export class AIService {
         return JSON.parse(jsonMatch[0]);
       }
       
+      console.warn('AI could not extract resume data into a valid JSON.');
       return { name: null, email: null, phone: null };
     } catch (error) {
       console.error('Error extracting resume data:', error);
@@ -50,16 +53,16 @@ export class AIService {
     previousQuestions: string[],
     apiKey: string | null | undefined
   ): Promise<InterviewQuestion> {
-    // If no API key is provided, or if it's an empty string, fall back to static questions.
-    if (!apiKey) {
-      return getStaticQuestion(difficulty, previousQuestions);
-    }
-
     const timeMap = {
       easy: 20,
       medium: 60,
       hard: 120,
     };
+
+    // If no API key is provided, or if it's an empty string, fall back to static questions.
+    if (!apiKey) {
+      return getStaticQuestion(difficulty, previousQuestions);
+    }
 
     const difficultyContext = {
       easy: 'basic concepts, simple coding problems, or fundamental knowledge',
@@ -71,17 +74,19 @@ export class AIService {
       ? `\n\nCRITICAL: Do NOT repeat any of these previous questions:\n- ${previousQuestions.join('\n- ')}`
       : '';
 
+    // Merged prompt with entropy for uniqueness
     const prompt = `
-      Generate a single ${difficulty} level MULTIPLE CHOICE interview question for a Full Stack Developer position (React/Node.js).
-      This question should test the candidate's knowledge of ${difficultyContext[difficulty]}.
+      You are an AI interviewer for a Full Stack Developer position (React/Node.js).
+      Generate a single, unique, ${difficulty} level MULTIPLE CHOICE interview question.
+      The question should test the candidate's knowledge of ${difficultyContext[difficulty]}.
       
-      Requirements for the question:
-      - Be specific, technical, and unique.
-      - Include exactly 4 multiple choice options.
-      - Only ONE option should be correct.
+      Requirements:
+      - The question must be specific, technical, and distinct from common examples.
+      - Provide exactly 4 multiple choice options.
+      - Only ONE option can be correct.
       ${previousQuestionsText}
 
-      Return your response as a single JSON object. Do not include any other text or markdown in your response.
+      Return your response as a single, clean JSON object. Do not include any other text, markdown, or explanations.
 
       The object MUST have this exact format:
       {
@@ -89,7 +94,7 @@ export class AIService {
         "options": ["A) [Option A]", "B) [Option B]", "C) [Option C]", "D) [Option D]"]
       }
 
-      To ensure variety, use this random seed in your generation process: ${Math.random()}
+      To ensure variety for different users, use this unique seed in your generation process: ${Date.now()}-${Math.random()}
     `;
 
     try {
@@ -103,7 +108,6 @@ export class AIService {
         const parsed = JSON.parse(jsonMatch[0]);
         
         const cleanQuestion = parsed.question.replace(/\*\*/g, '');
-
         return {
           id: `q_${Date.now()}`,
           question: cleanQuestion,
@@ -112,11 +116,10 @@ export class AIService {
           options: parsed.options
         };
       }
-      
-      throw new Error('Invalid or incomplete response format from AI');
+      throw new Error('Invalid or incomplete response format from AI for question generation.');
     } catch (error) {
       console.error('Error generating dynamic question, falling back to static:', error);
-      // If the AI call fails (e.g. invalid key), also fall back to static.
+      // Fallback to static question list when AI call fails
       return getStaticQuestion(difficulty, previousQuestions);
     }
   }
@@ -127,13 +130,14 @@ export class AIService {
     }
 
     const prompt = `
-      Score this interview answer on a scale of 0-10 and provide a brief constructive comment.
+      Score this interview answer on a scale of 0-10 and provide a brief, constructive comment (1-2 sentences).
       Question (${difficulty} level): ${question}
-      Answer: ${answer}
-      Return your response in this exact JSON format:
+      Candidate's Answer: "${answer}"
+      
+      Return your response in this exact JSON format, with no extra text or markdown:
       {
         "score": [number between 0-10],
-        "comment": "[brief constructive feedback in 1-2 sentences]"
+        "comment": "[brief constructive feedback]"
       }
     `;
 
@@ -151,10 +155,10 @@ export class AIService {
           comment: parsed.comment || 'No comment provided.'
         };
       }
-      return { score: 5, comment: 'Unable to evaluate answer properly.' };
+      return { score: 0, comment: 'AI was unable to score this answer.' };
     } catch (error) {
       console.error('Error scoring answer:', error);
-      return { score: 5, comment: 'Error occurred during scoring.' };
+      return { score: 0, comment: 'An error occurred during AI scoring.' };
     }
   }
 
@@ -174,17 +178,19 @@ export class AIService {
       `Question ${index + 1} (${answer.difficulty}): ${answer.question}\nAnswer: ${answer.answer}\nScore: ${answer.aiScore}/10\n`
     ).join('\n');
 
+    // Merged prompt for a robust, concise summary
     const prompt = `
-      Generate a comprehensive interview summary for candidate ${candidateName}.
-      Interview Performance:
+      As an AI hiring assistant, generate a professional interview summary for a candidate named ${candidateName}.
+      The summary should be concise (3-4 sentences) and cover the following points based on the provided interview data:
+      1.  An overall assessment of the candidate's performance.
+      2.  Mention one key strength.
+      3.  Mention one area for improvement.
+      4.  Provide a final hiring recommendation (e.g., "Strong Hire", "Good Candidate", "Needs Improvement").
+
+      Here is the interview data:
       ${answersText}
-      Average Score: ${averageScore.toFixed(1)}/10
-      Please provide:
-      1. Overall performance assessment
-      2. Key strengths demonstrated
-      3. Areas for improvement
-      4. Recommendation (Strong Hire/Hire/Maybe/No Hire)
-      Keep the summary professional, constructive, and concise (3-4 sentences).
+      
+      Return ONLY the summary text. Do not use markdown or JSON formatting.
     `;
 
     try {
@@ -192,6 +198,11 @@ export class AIService {
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const summary = response.text().trim();
+
+      if (!summary) {
+          throw new Error("AI returned an empty summary.");
+      }
+
       return {
         summary,
         overallScore: Math.round(averageScore * 10) / 10
@@ -199,7 +210,7 @@ export class AIService {
     } catch (error) {
       console.error('Error generating summary:', error);
       return {
-        summary: `${candidateName} completed the interview. AI summary failed to generate.`,
+        summary: `${candidateName} completed the interview. The AI summary could not be generated due to an error.`,
         overallScore: averageScore
       };
     }

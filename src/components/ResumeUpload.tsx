@@ -64,6 +64,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       });
       
       // Use the simulated text which is guaranteed to extract data correctly for the demo
+      // In a production environment, fileReader.result would contain the raw text/data.
       const text = `
         John Doe
         Software Engineer
