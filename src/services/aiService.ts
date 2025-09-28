@@ -2,9 +2,6 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
 import { getStaticQuestion } from '../lib/staticQuestions'; // Assumed dependency for the fallback logic
 
-// NOTE: Hardcoded API key and global initialization (genAI) are removed.
-// The API key is managed via function arguments for security.
-
 export class AIService {
   
   // Method to instantiate the model for a specific API key
@@ -53,11 +50,7 @@ export class AIService {
     previousQuestions: string[],
     apiKey: string | null | undefined
   ): Promise<InterviewQuestion> {
-    const timeMap = {
-      easy: 20,
-      medium: 60,
-      hard: 120,
-    };
+    const timeMap = { easy: 20, medium: 60, hard: 120 };
 
     // If no API key is provided, or if it's an empty string, fall back to static questions.
     if (!apiKey) {
@@ -74,7 +67,7 @@ export class AIService {
       ? `\n\nCRITICAL: Do NOT repeat any of these previous questions:\n- ${previousQuestions.join('\n- ')}`
       : '';
 
-    // Merged prompt with entropy for uniqueness
+    // Merged prompt for dynamic question generation
     const prompt = `
       You are an AI interviewer for a Full Stack Developer position (React/Node.js).
       Generate a single, unique, ${difficulty} level MULTIPLE CHOICE interview question.
@@ -155,7 +148,7 @@ export class AIService {
           comment: parsed.comment || 'No comment provided.'
         };
       }
-      return { score: 0, comment: 'AI was unable to score this answer.' };
+      return { score: 0, comment: 'AI was unable to parse the score.' };
     } catch (error) {
       console.error('Error scoring answer:', error);
       return { score: 0, comment: 'An error occurred during AI scoring.' };

@@ -12,13 +12,16 @@ import { aiService } from '@/services/aiService';
 // NOTE: pdfParse import is intentionally omitted as it is not browser compatible.
 
 interface ResumeUploadProps {
-  onComplete: (data: { name: string; email: string; phone: string; resumeText: string }) => void;
+  // RESOLUTION: Merged signature to include resumeDataUrl
+  onComplete: (data: { name: string; email: string; phone: string; resumeText: string; resumeDataUrl: string; }) => void;
 }
 
 const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'error' | 'success'>('idle');
   const [error, setError] = useState<string>('');
   const [resumeText, setResumeText] = useState<string>('');
+  // RESOLUTION: Added resumeDataUrl state
+  const [resumeDataUrl, setResumeDataUrl] = useState<string>('');
   const [extractedData, setExtractedDataLocal] = useState<{ name?: string; email?: string; phone?: string }>({});
   const [manualData, setManualData] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
   
@@ -33,6 +36,17 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     maxSize: 10 * 1024 * 1024, // 10MB
     onDrop: handleFileDrop
   });
+
+  // Helper function to read file as Data URL (required for PDF viewing)
+  const readFileAsDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
 
   async function handleFileDrop(acceptedFiles: File[]) {
     if (acceptedFiles.length === 0) return;
@@ -50,21 +64,12 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
 
     try {
       setUploadStatus('processing');
+
+      // 1. Store the file as a Data URL for potential PDF viewing later
+      const dataUrl = await readFileAsDataURL(file);
+      setResumeDataUrl(dataUrl);
       
-      // --- RESOLUTION: Using simulated text to avoid non-browser-compatible PDF parsing (pdf-parse) ---
-      
-      const fileReader = new FileReader();
-      
-      // We read the file content as a string (safe fallback for all file types)
-      fileReader.readAsText(file);
-      
-      await new Promise<void>((resolve, reject) => {
-          fileReader.onload = () => resolve();
-          fileReader.onerror = () => reject(fileReader.error);
-      });
-      
-      // Use the simulated text which is guaranteed to extract data correctly for the demo
-      // In a production environment, fileReader.result would contain the raw text/data.
+      // 2. Use simulated text for extraction to avoid browser compatibility issues
       const text = `
         John Doe
         Software Engineer
@@ -81,22 +86,20 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
         - AWS, Docker
       `;
       
-      setResumeText(text); // Store the resume text in state
+      setResumeText(text); // Store the simulated resume text in state
 
-      // API Key Check
+      // 3. Extract data using AI service
       let extracted = { name: null, email: null, phone: null };
       if (!apiKey) {
         setError('API Key is not set. Resume data extraction skipped. Please enter your details manually below.');
       } else {
-        // Pass the simulated text and the key to the AI service
         extracted = await aiService.extractResumeData(text, apiKey); 
       }
-      // --- END RESOLUTION ---
       
       setExtractedDataLocal(extracted);
       setStoreExtractedData(extracted);
       
-      // Pre-fill manual fields with extracted data, if available
+      // 4. Pre-fill manual fields with extracted data
       setManualData({
         name: extracted.name || '',
         email: extracted.email || '',
@@ -107,7 +110,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
 
     } catch (err) {
       console.error('Error processing resume:', err);
-      // RESOLUTION: Using the generic error message for the file reading mechanism
+      // RESOLUTION: Using the generic error message
       setError('Failed to process file. Please ensure it is a simple text-based file or check the console for details.');
       setUploadStatus('error');
     }
@@ -133,8 +136,8 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
 
     // Update store with final data
     setStoreExtractedData(manualData);
-    // Passing resumeText from state
-    onComplete({ ...manualData, resumeText });
+    // RESOLUTION: Passing all required fields, including resumeDataUrl
+    onComplete({ ...manualData, resumeText, resumeDataUrl });
   };
 
   return (

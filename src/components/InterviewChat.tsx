@@ -36,7 +36,7 @@ const InterviewChat: React.FC = () => {
     submitAnswer,
     nextQuestion,
     finishInterview,
-    apiKey // RESOLUTION: Including apiKey from the store
+    apiKey // Included apiKey from the store
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -208,6 +208,7 @@ const InterviewChat: React.FC = () => {
 
   const handleTimeUp = () => {
     if (!selectedOption) {
+      // Set a flag answer for time up
       setSelectedOption('No answer selected due to time limit.');
     }
     handleSubmitAnswer();
@@ -231,13 +232,21 @@ const InterviewChat: React.FC = () => {
       let finalTotalScore = 0;
 
       for (const answer of latestCandidate.answers) {
-        // Pass apiKey to the service call
-        const { score, comment } = await aiService.scoreAnswer(
-          answer.question,
-          answer.answer,
-          answer.difficulty,
-          apiKey
-        );
+        let score = 0;
+        let comment = 'No answer was provided before the time ran out.';
+
+        // RESOLUTION: Conditional scoring logic adopted from feature/dynamic-interview-flow
+        if (answer.answer !== 'No answer selected due to time limit.') {
+          // Pass apiKey to the service call
+          const aiResult = await aiService.scoreAnswer(
+            answer.question,
+            answer.answer,
+            answer.difficulty,
+            apiKey
+          );
+          score = aiResult.score;
+          comment = aiResult.comment;
+        }
         
         const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
 
