@@ -1,22 +1,19 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
+import { getStaticQuestion } from '../lib/staticQuestions'; // Assumed dependency for the fallback logic
 
-const API_KEY = import.meta.env.VITE_GOOGLE_AI_API_KEY;
-
-const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
+// NOTE: Global/Vite environment setup is removed. The key is managed via function arguments.
 
 export class AIService {
-  private getModel() {
-    if (!genAI) {
-      console.warn("VITE_GOOGLE_AI_API_KEY is not set. AI features are disabled.");
-      return null;
-    }
+  
+  // Method to instantiate the model for a specific API key
+  private getModel(apiKey: string) {
+    const genAI = new GoogleGenerativeAI(apiKey);
     return genAI.getGenerativeModel({ model: 'gemini-pro' });
   }
 
-  async extractResumeData(resumeText: string) {
-    const model = this.getModel();
-    if (!model) return { name: null, email: null, phone: null };
+  async extractResumeData(resumeText: string, apiKey: string) {
+    if (!apiKey) return { name: null, email: null, phone: null };
 
     const prompt = `
       Extract the following information from this resume text. Return ONLY a JSON object with these exact keys:
@@ -31,6 +28,7 @@ export class AIService {
     `;
 
     try {
+      const model = this.getModel(apiKey);
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
@@ -49,20 +47,19 @@ export class AIService {
 
   async generateQuestion(
     difficulty: 'easy' | 'medium' | 'hard',
-    previousQuestions: string[]
+    previousQuestions: string[],
+    apiKey: string | null | undefined
   ): Promise<InterviewQuestion> {
-    const model = this.getModel();
-    const timeMap = { easy: 20, medium: 60, hard: 120 };
-
-    if (!model) {
-      return {
-        id: `static_${difficulty}_${Date.now()}`,
-        question: `AI is disabled. What is a key concept in ${difficulty} web development?`,
-        options: ["Option A", "Option B", "Option C", "Option D"],
-        difficulty,
-        timeLimit: timeMap[difficulty],
-      };
+    // If no API key is provided, or if it's an empty string, fall back to static questions.
+    if (!apiKey) {
+      return getStaticQuestion(difficulty, previousQuestions);
     }
+
+    const timeMap = {
+      easy: 20,
+      medium: 60,
+      hard: 120,
+    };
 
     const difficultyContext = {
       easy: 'basic concepts, simple coding problems, or fundamental knowledge',
@@ -96,6 +93,7 @@ export class AIService {
     `;
 
     try {
+      const model = this.getModel(apiKey);
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
@@ -103,7 +101,9 @@ export class AIService {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
+        
         const cleanQuestion = parsed.question.replace(/\*\*/g, '');
+
         return {
           id: `q_${Date.now()}`,
           question: cleanQuestion,
@@ -112,22 +112,19 @@ export class AIService {
           options: parsed.options
         };
       }
+      
       throw new Error('Invalid or incomplete response format from AI');
     } catch (error) {
-      console.error('Error generating question:', error);
-      return {
-        id: `fallback_${difficulty}_${Date.now()}`,
-        question: 'An error occurred generating a question. Please discuss your favorite programming concept.',
-        options: ['Okay', 'Will do', 'I understand', 'Let\'s proceed'],
-        difficulty,
-        timeLimit: 30,
-      };
+      console.error('Error generating dynamic question, falling back to static:', error);
+      // If the AI call fails (e.g. invalid key), also fall back to static.
+      return getStaticQuestion(difficulty, previousQuestions);
     }
   }
 
-  async scoreAnswer(question: string, answer: string, difficulty: 'easy' | 'medium' | 'hard'): Promise<{ score: number; comment: string }> {
-    const model = this.getModel();
-    if (!model) return { score: 0, comment: 'AI scoring is disabled. Please set an API key.' };
+  async scoreAnswer(question: string, answer: string, difficulty: 'easy' | 'medium' | 'hard', apiKey: string): Promise<{ score: number; comment: string }> {
+    if (!apiKey) {
+      return { score: 0, comment: 'AI scoring is disabled. Please set an API key.' };
+    }
 
     const prompt = `
       Score this interview answer on a scale of 0-10 and provide a brief constructive comment.
@@ -141,6 +138,7 @@ export class AIService {
     `;
 
     try {
+      const model = this.getModel(apiKey);
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
@@ -160,12 +158,12 @@ export class AIService {
     }
   }
 
-  async generateFinalSummary(answers: InterviewAnswer[], candidateName: string): Promise<{ summary: string; overallScore: number }> {
-    const model = this.getModel();
+  async generateFinalSummary(answers: InterviewAnswer[], candidateName: string, apiKey: string): Promise<{ summary: string; overallScore: number }> {
+    // Safely calculate total score, accounting for potentially missing scores
     const totalScore = answers.reduce((sum, answer) => sum + (answer.aiScore || 0), 0);
     const averageScore = answers.length > 0 ? totalScore / answers.length : 0;
 
-    if (!model) {
+    if (!apiKey) {
       return {
         summary: 'AI summary is disabled. Please set an API key to enable this feature.',
         overallScore: 0
@@ -190,6 +188,7 @@ export class AIService {
     `;
 
     try {
+      const model = this.getModel(apiKey);
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const summary = response.text().trim();
