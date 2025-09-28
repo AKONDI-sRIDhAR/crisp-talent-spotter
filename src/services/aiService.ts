@@ -1,9 +1,53 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
-import { getStaticQuestion } from '../lib/staticQuestions'; // Assumed dependency for the fallback logic
+// FIX: Removed the faulty import: import { getStaticQuestion } from '../lib/staticQuestions';
 
-// NOTE: Hardcoded API key and global initialization (genAI) are removed.
-// The API key is managed via function arguments for security.
+/**
+ * Fallback function to return a static question when the API key is missing or the AI call fails.
+ * This is a temporary local implementation to fix the 'Failed to resolve import' error.
+ */
+const getStaticQuestion = (
+  difficulty: 'easy' | 'medium' | 'hard',
+  previousQuestions: string[]
+): InterviewQuestion => {
+  const timeMap = { easy: 20, medium: 60, hard: 120 };
+  
+  // Use a simple mechanism to return a non-repeating question for the fallback
+  const fallbacks: Record<'easy' | 'medium' | 'hard', InterviewQuestion> = {
+    easy: {
+      id: `fb_e`,
+      difficulty: 'easy',
+      question: 'What does `useState` return in React?',
+      options: ['A value and a function', 'An object', 'An array', 'A string'],
+      timeLimit: timeMap.easy
+    },
+    medium: {
+      id: `fb_m`,
+      difficulty: 'medium',
+      question: 'What is the purpose of middleware in Express.js?',
+      options: ['To manage database connections', 'To execute functions before the final route handler', 'To serve static files', 'To handle client-side routing'],
+      timeLimit: timeMap.medium
+    },
+    hard: {
+      id: `fb_h`,
+      difficulty: 'hard',
+      question: 'Explain the concept of Virtual DOM reconciliation in React.',
+      options: ['It updates the entire DOM tree in every render', 'It generates a synthetic DOM representation in memory', 'It compares the new Virtual DOM tree with the previous one to find differences', 'It skips rendering entirely'],
+      timeLimit: timeMap.hard
+    },
+  };
+
+  const baseQuestion = fallbacks[difficulty];
+  
+  // Simple rotation logic to prevent the exact same question string from appearing constantly
+  const suffix = ` (Fallback Q - ${previousQuestions.length + 1})`;
+
+  return {
+    ...baseQuestion,
+    id: `fb_${difficulty}_${Date.now()}`,
+    question: baseQuestion.question + suffix,
+  };
+};
 
 export class AIService {
   
