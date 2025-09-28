@@ -1,8 +1,17 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
-import { getStaticQuestion } from '../lib/staticQuestions';
+import { getStaticQuestion } from '../lib/staticQuestions'; // Assumed dependency for the fallback logic
+
+// NOTE: Hardcoded API key is removed.
 
 export class AIService {
+  
+  // Method to instantiate the model for a specific API key
+  private getModel(apiKey: string) {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    return genAI.getGenerativeModel({ model: 'gemini-pro' });
+  }
+
   async extractResumeData(resumeText: string, apiKey: string) {
     if (!apiKey) return { name: null, email: null, phone: null };
 
@@ -19,8 +28,7 @@ export class AIService {
     `;
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+      const model = this.getModel(apiKey);
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
@@ -85,8 +93,7 @@ export class AIService {
     `;
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+      const model = this.getModel(apiKey);
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
@@ -142,8 +149,7 @@ export class AIService {
     `;
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+      const model = this.getModel(apiKey);
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
@@ -165,6 +171,7 @@ export class AIService {
   }
 
   async generateFinalSummary(answers: InterviewAnswer[], candidateName: string, apiKey: string): Promise<{ summary: string; overallScore: number }> {
+    // Safely calculate total score, accounting for potentially missing scores (due to no API key on some answers)
     const totalScore = answers.reduce((sum, answer) => sum + (answer.aiScore || 0), 0);
     const averageScore = answers.length > 0 ? totalScore / answers.length : 0;
 
@@ -197,8 +204,7 @@ export class AIService {
     `;
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+      const model = this.getModel(apiKey);
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const summary = response.text().trim();
