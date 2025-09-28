@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
 
+// NOTE: In a real application, the API key should be loaded from environment variables
+// and NEVER hardcoded in source code.
 const API_KEY = 'AIzaSyCgbyLeYVkhGNLjCUQwv3SPLaZbMPYOxaY';
 const genAI = new GoogleGenerativeAI(API_KEY);
 
@@ -38,33 +40,41 @@ export class AIService {
     }
   }
 
-  async generateInterviewQuestions(): Promise<InterviewQuestion[]> {
+  // RENAMED and MERGED to align with dynamic single-question generation used in InterviewChat.tsx
+  async generateQuestion(
+    difficulty: 'easy' | 'medium' | 'hard',
+    previousQuestions: string[] // Added parameters for dynamic generation
+  ): Promise<InterviewQuestion> {
     const timeMap = {
       easy: 20,
       medium: 60,
       hard: 120,
     };
 
-    const prompt = `
-      Generate a complete set of 6 MULTIPLE CHOICE interview questions for a Full Stack Developer position (React/Node.js).
-      
-      The set MUST contain exactly:
-      - 2 'easy' level questions
-      - 2 'medium' level questions
-      - 2 'hard' level questions
+    const difficultyContext = {
+      easy: 'basic concepts, simple coding problems, or fundamental knowledge',
+      medium: 'intermediate concepts, moderate coding challenges, or problem-solving scenarios',
+      hard: 'advanced concepts, complex algorithms, system design, or challenging technical problems'
+    };
 
-      Requirements for each question:
+    const previousQuestionsText = previousQuestions.length > 0
+      ? `\n\nCRITICAL: Do NOT repeat any of these previous questions:\n- ${previousQuestions.join('\n- ')}`
+      : '';
+
+    const prompt = `
+      Generate a single ${difficulty} level MULTIPLE CHOICE interview question for a Full Stack Developer position (React/Node.js).
+      This question should test the candidate's knowledge of ${difficultyContext[difficulty]}.
+      
+      Requirements for the question:
       - Be specific, technical, and unique.
-      - Focus on practical knowledge and problem-solving.
       - Include exactly 4 multiple choice options.
       - Only ONE option should be correct.
-      
-      Return your response as a single JSON object with a "questions" key, which is an array of 6 question objects.
-      Do not include any other text or markdown in your response.
+      ${previousQuestionsText}
 
-      Each object in the array must have this exact format:
+      Return your response as a single JSON object. Do not include any other text or markdown in your response.
+
+      The object MUST have this exact format:
       {
-        "difficulty": "easy" | "medium" | "hard",
         "question": "[The question text]",
         "options": ["A) [Option A]", "B) [Option B]", "C) [Option C]", "D) [Option D]"]
       }
@@ -80,28 +90,31 @@ export class AIService {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed.questions && parsed.questions.length === 6) {
-          return parsed.questions.map((q: any) => ({
-            ...q,
-            id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            question: q.question.replace(/\*\*/g, ''), // Clean markdown
-            timeLimit: timeMap[q.difficulty as 'easy' | 'medium' | 'hard'],
-          }));
-        }
+        
+        // Clean up markdown from the question
+        const cleanQuestion = parsed.question.replace(/\*\*/g, '');
+
+        return {
+          id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          question: cleanQuestion,
+          difficulty, // Use the provided difficulty
+          timeLimit: timeMap[difficulty],
+          options: parsed.options
+        };
       }
       
       throw new Error('Invalid or incomplete response format from AI');
     } catch (error) {
-      console.error('Error generating interview questions:', error);
-      // In case of an API error, return a hardcoded fallback set of questions
-      return [
-        { id: 'fb_1', difficulty: 'easy', question: 'What does `useState` return in React?', options: ['A) A value and a function', 'B) An object', 'C) An array', 'D) A string'], timeLimit: 20 },
-        { id: 'fb_2', difficulty: 'easy', question: 'Which of these is a valid Node.js module for handling file paths?', options: ['A) fs', 'B) path', 'C) http', 'D) url'], timeLimit: 20 },
-        { id: 'fb_3', difficulty: 'medium', question: 'What is the purpose of the `useEffect` hook in React?', options: ['A) To fetch data', 'B) To perform side effects', 'C) To manage state', 'D) To create context'], timeLimit: 60 },
-        { id: 'fb_4', difficulty: 'medium', question: 'What is middleware in the context of Express.js?', options: ['A) A database driver', 'B) A templating engine', 'C) A function with access to req and res objects', 'D) A client-side library'], timeLimit: 60 },
-        { id: 'fb_5', difficulty: 'hard', question: 'How would you optimize a React application that is rendering slowly?', options: ['A) Using `React.memo` and `useCallback`', 'B) Code splitting', 'C) Virtualizing long lists', 'D) All of the above'], timeLimit: 120 },
-        { id: 'fb_6', difficulty: 'hard', question: 'Describe the Node.js event loop.', options: ['A) A single-threaded, non-blocking I/O model', 'B) A multi-threaded process for handling requests', 'C) A browser-based API', 'D) A way to manage global variables'], timeLimit: 120 },
-      ];
+      console.error('Error generating question:', error);
+      
+      // Return a hardcoded fallback question matching the requested difficulty
+      const fallbackQuestions: Record<'easy' | 'medium' | 'hard', InterviewQuestion> = {
+        easy: { id: 'fb_e', difficulty: 'easy', question: 'What does `useState` return in React?', options: ['A) A value and a function', 'B) An object', 'C) An array', 'D) A string'], timeLimit: timeMap.easy },
+        medium: { id: 'fb_m', difficulty: 'medium', question: 'What is middleware in the context of Express.js?', options: ['A) A database driver', 'B) A templating engine', 'C) A function with access to req and res objects', 'D) A client-side library'], timeLimit: timeMap.medium },
+        hard: { id: 'fb_h', difficulty: 'hard', question: 'How would you optimize a React app that is rendering slowly?', options: ['A) Using `React.memo`', 'B) Code splitting', 'C) Virtualizing long lists', 'D) All of the above'], timeLimit: timeMap.hard },
+      };
+      
+      return fallbackQuestions[difficulty];
     }
   }
 

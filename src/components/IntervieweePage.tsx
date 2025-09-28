@@ -6,6 +6,7 @@ import ResumeUpload from './ResumeUpload';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
+// NOTE: aiService import is removed as it's not used in this component after resolution
 
 type NewCandidateData = {
   name: string;
@@ -36,10 +37,9 @@ const IntervieweePage: React.FC = () => {
     }
   }, [currentCandidate]);
 
-  const startNewInterview = async (data: NewCandidateData) => {
-    // Generate the full set of questions first
-    const questions = await aiService.generateInterviewQuestions();
-
+  // Merged: Using the synchronous pattern for starting the interview,
+  // as question generation is now handled dynamically in InterviewChat.
+  const startNewInterview = (data: NewCandidateData) => {
     // Create a new candidate
     const newCandidate: Candidate = {
       id: `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -52,7 +52,8 @@ const IntervieweePage: React.FC = () => {
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
-      questions, // Store the pre-generated questions
+      // The 'questions' property has been omitted/initialized to [] 
+      // as the generation is dynamic (handled by InterviewChat).
     };
 
     // If there was an old in-progress interview, mark it as completed
@@ -88,9 +89,10 @@ const IntervieweePage: React.FC = () => {
     }
   };
 
-  const handleStartNewInterview = async () => {
+  // Merged: Reverting to synchronous function call based on synchronous startNewInterview
+  const handleStartNewInterview = () => {
     if (newCandidateData) {
-      await startNewInterview(newCandidateData);
+      startNewInterview(newCandidateData);
       setShowWelcomeBackModal(false);
     }
   };

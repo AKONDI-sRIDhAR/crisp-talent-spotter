@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import Timer from '@/components/ui/timer';
-import { useInterviewStore } from '@/store/interviewStore';
+import { useInterviewStore, Candidate } from '@/store/interviewStore'; // Assuming Candidate type is exported from store
 import { aiService } from '@/services/aiService';
 
 interface Message {
@@ -78,34 +78,56 @@ const InterviewChat: React.FC = () => {
     }
   }, [currentCandidate]);
 
-  const generateNextQuestion = () => {
+  const generateNextQuestion = async () => {
+    // Get the LATEST state directly from the store to prevent stale closures
     const latestCandidate = useInterviewStore.getState().currentCandidate;
+
     if (!latestCandidate) return;
 
     const questionIndex = latestCandidate.currentQuestionIndex;
-    const questionData = latestCandidate.questions[questionIndex];
 
-    if (!questionData) {
-      // This case should ideally not be reached if the interview ends correctly
-      console.error("No more questions available.");
-      finishInterviewProcess();
+
+    if (questionIndex >= 6) {
+      await finishInterviewProcess();
       return;
     }
 
-    setCurrentQuestion(questionData);
-    setTimeRemaining(questionData.timeLimit);
 
-    const questionMessage: Message = {
-      id: questionData.id,
-      type: 'ai',
-      content: `Question ${questionIndex + 1}/6 (${questionData.difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
-      timestamp: new Date(),
-      isQuestion: true,
-      options: questionData.options,
-    };
+    setIsLoading(true);
 
-    setMessages(prev => [...prev, questionMessage]);
-    setTimerActive(true);
+    try {
+      const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
+      const difficulty = difficulties[latestCandidate.currentQuestionIndex];
+      
+      const previousQuestions = latestCandidate.answers.map(a => a.question);
+      const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
+      
+      setCurrentQuestion(questionData);
+      setTimeRemaining(questionData.timeLimit);
+      
+      const questionMessage: Message = {
+        id: `question-${latestCandidate.currentQuestionIndex}`,
+        type: 'ai',
+        content: `Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
+        timestamp: new Date(),
+        isQuestion: true,
+        options: questionData.options
+      };
+      
+      setMessages(prev => [...prev, questionMessage]);
+      setTimerActive(true);
+    } catch (error) {
+      console.error('Error generating question:', error);
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        type: 'ai',
+        content: 'I apologize, but there was an error generating the next question. Please try refreshing the page.',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmitAnswer = async () => {
@@ -214,7 +236,7 @@ const InterviewChat: React.FC = () => {
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        content: `🎉 Interview Complete!\n\nFinal Score: ${finalTotalScore.toFixed(1)}/15\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
+        content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
         timestamp: new Date()
       };
 
@@ -226,9 +248,13 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      // Even on error, we should try to finish the interview with available data
+      
+      // *** FIX APPLIED HERE ***
+      // Removed the colon (:) from the end of the function call.
+      // Retained the logic to mark the interview as completed on error.
       const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
-      finishInterview(candidateOnError);
+      finishInterview(candidateOnError); // Corrected syntax
+      
     } finally {
       setIsLoading(false);
     }
