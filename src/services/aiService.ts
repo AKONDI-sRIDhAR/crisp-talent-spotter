@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
-// NOTE: The external import for staticQuestions is removed to resolve the build error.
+// NOTE: The external import for staticQuestions is removed and the function is defined locally.
 
 // --- Local Fallback Implementation ---
 /**
@@ -13,6 +13,9 @@ const getStaticQuestion = (
 ): InterviewQuestion => {
   const timeMap = { easy: 20, medium: 60, hard: 120 };
   
+  // Use a simple rotation mechanism based on the number of previous questions
+  const index = previousQuestions.length % 3;
+
   const fallbacks: Record<'easy' | 'medium' | 'hard', InterviewQuestion[]> = {
     easy: [
       {
@@ -119,15 +122,17 @@ export class AIService {
   }
 
   // --- Resume Extraction ---
+  // NOTE: resumeData is updated to include 'summary' from the new logic
   async extractResumeData(resumeText: string, apiKey: string) {
-    if (!apiKey) return { name: null, email: null, phone: null };
-    if (!resumeText) return { name: null, email: null, phone: null };
+    if (!apiKey) return { name: null, email: null, phone: null, summary: null };
+    if (!resumeText) return { name: null, email: null, phone: null, summary: null };
 
     const prompt = `
       Extract the following information from this resume text. Return ONLY a JSON object with these exact keys:
       - name: candidate's full name
       - email: email address
       - phone: phone number
+      - summary: A concise 2-3 sentence summary of the candidate's professional experience and skills.
       
       If any field is not found, use null as the value.
       
@@ -147,10 +152,10 @@ export class AIService {
       }
       
       console.warn('AI could not extract resume data into a valid JSON.');
-      return { name: null, email: null, phone: null };
+      return { name: null, email: null, phone: null, summary: null };
     } catch (error) {
       console.error('Error extracting resume data:', error);
-      return { name: null, email: null, phone: null };
+      return { name: null, email: null, phone: null, summary: null };
     }
   }
 
@@ -289,30 +294,63 @@ export class AIService {
   }
 
   // --- Final Summary Generation ---
-  async generateFinalSummary(
-    answers: InterviewAnswer[],
-    candidateName: string
-  ): Promise<{ summary: string; overallScore: number }> {
+  async generateFinalSummary(answers: InterviewAnswer[], candidateName: string, resumeSummary: string | null, apiKey: string): Promise<{ summary: string; overallScore: number }> {
+    // Safely calculate total score, accounting for potentially missing scores
     const totalScore = answers.reduce((sum, answer) => sum + (answer.aiScore || 0), 0);
     const averageScore = answers.length > 0 ? totalScore / answers.length : 0;
-    const overallScore = Math.round(averageScore * 10) / 10;
 
-    const totalTimeUsed = answers.reduce((sum, answer) => sum + answer.timeUsed, 0);
-    const averageTimeUsed = answers.length > 0 ? Math.round(totalTimeUsed / answers.length) : 0;
-
-    let recommendation = "Needs Improvement";
-    if (overallScore >= 7) {
-      recommendation = "Strong Hire";
-    } else if (overallScore >= 5) {
-      recommendation = "Good Candidate";
+    if (!apiKey) {
+      return {
+        summary: 'AI summary is disabled. Please set an API key to enable this feature.',
+        overallScore: 0
+      };
     }
     
-    const summary = `Candidate ${candidateName} completed the interview with an overall score of ${overallScore}/10. They answered ${answers.length} questions with an average response time of ${averageTimeUsed} seconds. Based on the score, the initial recommendation is: ${recommendation}. Please review the detailed answers.`;
+    const answersText = answers.map((answer, index) => 
+      `Question ${index + 1} (${answer.difficulty}): ${answer.question}\nAnswer: ${answer.answer}\nScore: ${answer.aiScore}/10\n`
+    ).join('\n');
 
-    return Promise.resolve({
-      summary,
-      overallScore
-    });
+    const resumeContext = resumeSummary
+      ? `\n**Candidate's Resume Summary:**\n${resumeSummary}\n`
+      : '';
+
+    // Merged prompt for a robust, concise summary
+    const prompt = `
+      As an AI hiring assistant, generate a professional interview summary for a candidate named ${candidateName}.
+      The summary should be concise (3-4 sentences) and cover the following points based on the provided interview data and resume summary:
+      1.  An overall assessment of the candidate's performance, considering both their interview answers and resume.
+      2.  Mention one key strength, drawing from either the interview or resume.
+      3.  Mention one area for improvement based on the interview.
+      4.  Provide a final hiring recommendation (e.g., "Strong Hire", "Good Candidate", "Needs Improvement").
+
+      ${resumeContext}
+      **Interview Performance:**
+      ${answersText}
+      
+      Return ONLY the summary text. Do not use markdown or JSON formatting.
+    `;
+
+    try {
+      const model = this.getModel(apiKey);
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const summary = response.text().trim();
+
+      if (!summary) {
+          throw new Error("AI returned an empty summary.");
+      }
+
+      return {
+        summary,
+        overallScore: Math.round(averageScore * 10) / 10
+      };
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      return {
+        summary: `${candidateName} completed the interview. The AI summary could not be generated due to an error.`,
+        overallScore: averageScore
+      };
+    }
   }
 }
 
