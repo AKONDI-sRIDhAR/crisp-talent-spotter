@@ -9,6 +9,7 @@ export interface Candidate {
   resumeText?: string;
   resumeFile?: File;
   resumeDataUrl?: string;
+  resumeSummary?: string | null;
   score: number;
   status: 'pending' | 'in-progress' | 'completed';
   startTime?: Date;
@@ -71,8 +72,9 @@ interface InterviewStore {
     name?: string;
     email?: string;
     phone?: string;
+    summary?: string | null;
   };
-  setExtractedData: (data: { name?: string; email?: string; phone?: string }) => void;
+  setExtractedData: (data: { name?: string; email?: string; phone?: string, summary?: string | null }) => void;
 
   // For cycling through pre-generated question sets
   questionSetIndex: number;

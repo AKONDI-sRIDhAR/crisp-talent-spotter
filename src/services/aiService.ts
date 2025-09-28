@@ -13,9 +13,6 @@ const getStaticQuestion = (
 ): InterviewQuestion => {
   const timeMap = { easy: 20, medium: 60, hard: 120 };
   
-  // Use a simple rotation mechanism based on the number of previous questions
-  const index = previousQuestions.length % 3;
-
   const fallbacks: Record<'easy' | 'medium' | 'hard', InterviewQuestion[]> = {
     easy: [
       {
@@ -88,7 +85,21 @@ const getStaticQuestion = (
     ],
   };
 
-  const selectedQuestion = fallbacks[difficulty][index];
+  const availableQuestions = fallbacks[difficulty].filter(
+    q => !previousQuestions.includes(q.question)
+  );
+
+  let selectedQuestion;
+
+  if (availableQuestions.length > 0) {
+    const randomIndex = Math.floor(Math.random() * availableQuestions.length);
+    selectedQuestion = availableQuestions[randomIndex];
+  } else {
+    // Fallback if all questions have been asked
+    const allQuestions = fallbacks[difficulty];
+    const randomIndex = Math.floor(Math.random() * allQuestions.length);
+    selectedQuestion = allQuestions[randomIndex];
+  }
   
   // Ensure the question ID is unique each time it's returned
   return {
@@ -109,14 +120,15 @@ export class AIService {
 
   // --- Resume Extraction ---
   async extractResumeData(resumeText: string, apiKey: string) {
-    if (!apiKey) return { name: null, email: null, phone: null };
-    if (!resumeText) return { name: null, email: null, phone: null };
+    if (!apiKey) return { name: null, email: null, phone: null, summary: null };
+    if (!resumeText) return { name: null, email: null, phone: null, summary: null };
 
     const prompt = `
       Extract the following information from this resume text. Return ONLY a JSON object with these exact keys:
       - name: candidate's full name
       - email: email address
       - phone: phone number
+      - summary: A concise 2-3 sentence summary of the candidate's professional experience and skills.
       
       If any field is not found, use null as the value.
       
@@ -136,10 +148,10 @@ export class AIService {
       }
       
       console.warn('AI could not extract resume data into a valid JSON.');
-      return { name: null, email: null, phone: null };
+      return { name: null, email: null, phone: null, summary: null };
     } catch (error) {
       console.error('Error extracting resume data:', error);
-      return { name: null, email: null, phone: null };
+      return { name: null, email: null, phone: null, summary: null };
     }
   }
 
@@ -278,7 +290,7 @@ export class AIService {
   }
 
   // --- Final Summary Generation ---
-  async generateFinalSummary(answers: InterviewAnswer[], candidateName: string, apiKey: string): Promise<{ summary: string; overallScore: number }> {
+  async generateFinalSummary(answers: InterviewAnswer[], candidateName: string, resumeSummary: string | null, apiKey: string): Promise<{ summary: string; overallScore: number }> {
     // Safely calculate total score, accounting for potentially missing scores
     const totalScore = answers.reduce((sum, answer) => sum + (answer.aiScore || 0), 0);
     const averageScore = answers.length > 0 ? totalScore / answers.length : 0;
@@ -294,16 +306,21 @@ export class AIService {
       `Question ${index + 1} (${answer.difficulty}): ${answer.question}\nAnswer: ${answer.answer}\nScore: ${answer.aiScore}/10\n`
     ).join('\n');
 
+    const resumeContext = resumeSummary
+      ? `\n**Candidate's Resume Summary:**\n${resumeSummary}\n`
+      : '';
+
     // Merged prompt for a robust, concise summary
     const prompt = `
       As an AI hiring assistant, generate a professional interview summary for a candidate named ${candidateName}.
-      The summary should be concise (3-4 sentences) and cover the following points based on the provided interview data:
-      1.  An overall assessment of the candidate's performance.
-      2.  Mention one key strength.
-      3.  Mention one area for improvement.
+      The summary should be concise (3-4 sentences) and cover the following points based on the provided interview data and resume summary:
+      1.  An overall assessment of the candidate's performance, considering both their interview answers and resume.
+      2.  Mention one key strength, drawing from either the interview or resume.
+      3.  Mention one area for improvement based on the interview.
       4.  Provide a final hiring recommendation (e.g., "Strong Hire", "Good Candidate", "Needs Improvement").
 
-      Here is the interview data:
+      ${resumeContext}
+      **Interview Performance:**
       ${answersText}
       
       Return ONLY the summary text. Do not use markdown or JSON formatting.
