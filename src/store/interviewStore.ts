@@ -62,7 +62,7 @@ interface InterviewStore {
   // Interview flow
   submitAnswer: (answer: string, timeUsed: number) => void;
   nextQuestion: () => void;
-  finishInterview: () => void;
+  finishInterview: (finalCandidate: Candidate) => void;
 
   // Resume data extraction
   extractedData: {
@@ -154,20 +154,13 @@ export const useInterviewStore = create<InterviewStore>()(
         }));
       },
 
-      finishInterview: () => {
-        const state = get();
-        if (!state.currentCandidate) return;
-
-        const completedCandidate = {
-          ...state.currentCandidate,
-          status: 'completed' as const,
-          endTime: new Date(),
-        };
-
+      finishInterview: (finalCandidate) => {
         set((state) => ({
-          candidates: state.candidates.map(c => 
-            c.id === completedCandidate.id ? completedCandidate : c
+          // Update the main list of candidates with the final, scored data
+          candidates: state.candidates.map(c =>
+            c.id === finalCandidate.id ? finalCandidate : c
           ),
+          // Clear the session
           currentCandidate: null,
           currentQuestion: null,
           currentMode: 'landing',
