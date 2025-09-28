@@ -36,7 +36,7 @@ const InterviewChat: React.FC = () => {
     submitAnswer,
     nextQuestion,
     finishInterview,
-    updateCandidate
+    apiKey
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -71,6 +71,18 @@ const InterviewChat: React.FC = () => {
 
     if (!latestCandidate) return;
 
+    if (!apiKey) {
+      const errorMessage: Message = {
+        id: `error-no-api-key`,
+        type: 'ai',
+        content: 'The API key is missing. Please set it on the homepage to begin the interview.',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      setIsLoading(false);
+      return;
+    }
+
     const questionIndex = latestCandidate.currentQuestionIndex;
 
     if (questionIndex >= 6) {
@@ -86,7 +98,7 @@ const InterviewChat: React.FC = () => {
       
       const previousQuestions = latestCandidate.answers.map(a => a.question);
       // Calls the dynamic AI service method
-      const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
+      const questionData = await aiService.generateQuestion(difficulty, previousQuestions, apiKey);
       
       setCurrentQuestion(questionData);
       setTimeRemaining(questionData.timeLimit);
@@ -107,7 +119,7 @@ const InterviewChat: React.FC = () => {
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
         type: 'ai',
-        content: 'I apologize, but there was an error generating the next question. Please try refreshing the page.',
+        content: `I apologize, but there was an error generating the next question. This could be due to an invalid API key or a network issue. Please check your key on the homepage or try refreshing.`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -218,7 +230,8 @@ const InterviewChat: React.FC = () => {
         const { score, comment } = await aiService.scoreAnswer(
           answer.question,
           answer.answer,
-          answer.difficulty
+          answer.difficulty,
+          apiKey
         );
         
         const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
@@ -235,7 +248,8 @@ const InterviewChat: React.FC = () => {
 
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
-        latestCandidate.name
+        latestCandidate.name,
+        apiKey
       );
 
       const finalCandidate: Candidate = {
