@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
-// NOTE: The external import for staticQuestions is removed to resolve the build error.
+// NOTE: The external import for staticQuestions is removed and the function is defined locally.
 
 // --- Local Fallback Implementation ---
 /**
@@ -13,6 +13,9 @@ const getStaticQuestion = (
 ): InterviewQuestion => {
   const timeMap = { easy: 20, medium: 60, hard: 120 };
   
+  // Use a simple rotation mechanism based on the number of previous questions
+  const index = previousQuestions.length % 3;
+
   const fallbacks: Record<'easy' | 'medium' | 'hard', InterviewQuestion[]> = {
     easy: [
       {
@@ -119,6 +122,7 @@ export class AIService {
   }
 
   // --- Resume Extraction ---
+  // NOTE: resumeData is updated to include 'summary' from the new logic
   async extractResumeData(resumeText: string, apiKey: string) {
     if (!apiKey) return { name: null, email: null, phone: null, summary: null };
     if (!resumeText) return { name: null, email: null, phone: null, summary: null };
