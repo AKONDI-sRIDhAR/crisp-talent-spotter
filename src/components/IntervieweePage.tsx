@@ -6,13 +6,14 @@ import ResumeUpload from './ResumeUpload';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
+// NOTE: import { questionSets } from '@/lib/preGeneratedQuestions'; is removed, as questions are generated dynamically.
 
 type NewCandidateData = {
   name: string;
   email: string;
   phone: string;
   resumeText: string;
-  resumeDataUrl: string;
+  resumeDataUrl: string; // The correct, merged type definition
 };
 
 const IntervieweePage: React.FC = () => {
@@ -28,6 +29,8 @@ const IntervieweePage: React.FC = () => {
     addCandidate,
     updateCandidate,
     setCurrentMode,
+    questionSetIndex, // Kept for minimal change, though unused in dynamic flow
+    incrementQuestionSetIndex, // Kept for minimal change, though unused in dynamic flow
   } = useInterviewStore();
 
   useEffect(() => {
@@ -45,13 +48,13 @@ const IntervieweePage: React.FC = () => {
       email: data.email,
       phone: data.phone,
       resumeText: data.resumeText,
-      resumeDataUrl: data.resumeDataUrl,
+      resumeDataUrl: data.resumeDataUrl, // Correctly assigns the data URL
       score: 0,
       status: 'in-progress',
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
-      questions: [], // Questions will be generated live by the AI
+      questions: [], // RESOLUTION: Initializing questions array as empty for dynamic generation
     };
 
     // If there was an old in-progress interview, mark it as completed
