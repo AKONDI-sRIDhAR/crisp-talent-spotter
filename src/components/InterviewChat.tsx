@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import Timer from '@/components/ui/timer';
-import { useInterviewStore } from '@/store/interviewStore';
+import { useInterviewStore, Candidate } from '@/store/interviewStore'; // Assuming Candidate type is exported from store
 import { aiService } from '@/services/aiService';
 
 interface Message {
@@ -108,8 +108,6 @@ const InterviewChat: React.FC = () => {
       const questionMessage: Message = {
         id: `question-${latestCandidate.currentQuestionIndex}`,
         type: 'ai',
-        content: `Question ${latestCandidate.currentQuestionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
-
         content: `Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
         timestamp: new Date(),
         isQuestion: true,
@@ -228,11 +226,6 @@ const InterviewChat: React.FC = () => {
 
       const finalCandidate: Candidate = {
         ...latestCandidate,
-
-
-
-        ...currentCandidate,
-
         answers: scoredAnswers,
         score: finalTotalScore,
         aiSummary: summary,
@@ -243,11 +236,7 @@ const InterviewChat: React.FC = () => {
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        content: `🎉 Interview Complete!\n\nFinal Score: ${finalTotalScore.toFixed(1)}/15\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
-
-
         content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
-
         timestamp: new Date()
       };
 
@@ -259,13 +248,13 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-     
-
-
+      
+      // *** FIX APPLIED HERE ***
+      // Removed the colon (:) from the end of the function call.
+      // Retained the logic to mark the interview as completed on error.
       const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
-      finishInterview(candidateOnError):
-      const errorCandidate = { ...currentCandidate, status: 'completed' as const, endTime: new Date() };
-      finishInterview(errorCandidate);
+      finishInterview(candidateOnError); // Corrected syntax
+      
     } finally {
       setIsLoading(false);
     }
