@@ -1,17 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Users, MessageSquare, Sparkles, Timer } from 'lucide-react';
+import { Users, MessageSquare, Sparkles, Timer, Settings } from 'lucide-react';
 import LiquidEther from './LiquidEther';
+import ApiModal from './ApiModal';
 import { useInterviewStore } from '@/store/interviewStore';
 
 const LandingPage: React.FC = () => {
-  const { setCurrentMode } = useInterviewStore();
+  const { setCurrentMode, apiKey, setApiKey } = useInterviewStore();
+  const [isApiModalOpen, setIsApiModalOpen] = useState(false);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background to-muted/20">
-      {/* LiquidEther Background */}
+      <div className="absolute top-4 right-4 z-20">
+        <Button variant="ghost" size="icon" onClick={() => setIsApiModalOpen(true)}>
+          <Settings className="h-5 w-5" />
+        </Button>
+      </div>
+      <ApiModal
+        isOpen={isApiModalOpen}
+        onClose={() => setIsApiModalOpen(false)}
+        onSave={setApiKey}
+        currentApiKey={apiKey}
+      />
       <div className="absolute inset-0">
         <LiquidEther
           colors={['#5227FF', '#FF9FFC', '#B19EEF']}
