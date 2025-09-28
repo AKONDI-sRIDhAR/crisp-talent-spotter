@@ -12,7 +12,7 @@ import { aiService } from '@/services/aiService';
 // FIX: pdfParse import is intentionally omitted as it is not browser compatible.
 
 interface ResumeUploadProps {
-  onComplete: (data: { name: string; email: string; phone: string; resumeText: string; resumeDataUrl: string; }) => void;
+  onComplete: (data: { name: string; email: string; phone: string; resumeText: string; resumeDataUrl: string; resumeSummary: string | null; }) => void;
 }
 
 const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
@@ -20,8 +20,9 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
   const [error, setError] = useState<string>('');
   const [resumeText, setResumeText] = useState<string>('');
   const [resumeDataUrl, setResumeDataUrl] = useState<string>('');
+  const [resumeSummary, setResumeSummary] = useState<string | null>(null);
   // RESOLUTION: Combining duplicate state definitions and ensuring imports are correct
-  const [extractedData, setExtractedDataLocal] = useState<{ name?: string; email?: string; phone?: string }>({});
+  const [extractedData, setExtractedDataLocal] = useState<{ name?: string; email?: string; phone?: string; summary?: string | null; }>({});
   const [manualData, setManualData] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
   
   const { setExtractedData: setStoreExtractedData, apiKey } = useInterviewStore();
@@ -89,7 +90,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       setResumeText(text); // Store the simulated resume text in state
 
       // 3. Extract data using AI service
-      let extracted = { name: null, email: null, phone: null };
+      let extracted = { name: null, email: null, phone: null, summary: null };
       if (!apiKey) {
         setError('API Key is not set. Resume data extraction skipped. Please enter your details manually below.');
       } else {
@@ -98,6 +99,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       
       setExtractedDataLocal(extracted);
       setStoreExtractedData(extracted);
+      setResumeSummary(extracted.summary || null);
       
       // 4. Pre-fill manual fields with extracted data
       setManualData({
@@ -135,9 +137,9 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     }
 
     // Update store with final data
-    setStoreExtractedData(manualData);
+    setStoreExtractedData({ ...manualData, summary: resumeSummary });
     // Passing all required fields, including resumeDataUrl
-    onComplete({ ...manualData, resumeText, resumeDataUrl });
+    onComplete({ ...manualData, resumeText, resumeDataUrl, resumeSummary });
   };
 
   return (
