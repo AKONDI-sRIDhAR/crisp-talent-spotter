@@ -15,6 +15,7 @@ export interface Candidate {
   answers: InterviewAnswer[];
   aiSummary?: string;
   currentQuestionIndex: number;
+  questions: InterviewQuestion[];
 }
 
 export interface InterviewAnswer {
