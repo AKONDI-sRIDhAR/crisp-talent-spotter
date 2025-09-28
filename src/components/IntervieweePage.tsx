@@ -4,44 +4,47 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import ResumeUpload from './ResumeUpload';
 import InterviewChat from './InterviewChat';
+import WelcomeBackModal from './WelcomeBackModal';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
+
+type NewCandidateData = {
+  name: string;
+  email: string;
+  phone: string;
+  resumeText: string;
+};
 
 const IntervieweePage: React.FC = () => {
   const [step, setStep] = useState<'upload' | 'interview'>('upload');
-  
+  const [showWelcomeBackModal, setShowWelcomeBackModal] = useState(false);
+  const [newCandidateData, setNewCandidateData] = useState<NewCandidateData | null>(null);
+  const [existingCandidate, setExistingCandidate] = useState<Candidate | null>(null);
+
   const { 
     currentCandidate,
     setCurrentCandidate,
-    extractedData,
+    candidates,
     addCandidate,
+    updateCandidate,
     setCurrentMode,
-    setShowWelcomeBack
   } = useInterviewStore();
 
-  // Check if we have an existing candidate and should show welcome back
   useEffect(() => {
-    const storedData = localStorage.getItem('interview-store');
-    if (storedData) {
-      const parsed = JSON.parse(storedData);
-      if (parsed.state?.currentCandidate?.status === 'in-progress') {
-        setShowWelcomeBack(true);
-      }
-    }
-  }, [setShowWelcomeBack]);
-
-  useEffect(() => {
+    // If there's a candidate in the store, we are in an active interview
     if (currentCandidate && currentCandidate.status !== 'completed') {
       setStep('interview');
     }
   }, [currentCandidate]);
 
+  const startNewInterview = (data: NewCandidateData) => {
 
     // Create a new candidate
-    const candidate: Candidate = {
+    const newCandidate: Candidate = {
       id: `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: data.name,
       email: data.email,
       phone: data.phone,
+      resumeText: data.resumeText,
 
       score: 0,
       status: 'in-progress',
@@ -50,9 +53,44 @@ const IntervieweePage: React.FC = () => {
       currentQuestionIndex: 0
     };
 
-    setCurrentCandidate(candidate);
-    addCandidate(candidate);
+    // If there was an old in-progress interview, mark it as completed
+    if (existingCandidate) {
+      updateCandidate(existingCandidate.id, { status: 'completed', endTime: new Date() });
+    }
+
+    addCandidate(newCandidate);
+    setCurrentCandidate(newCandidate);
     setStep('interview');
+  };
+
+  const handleResumeComplete = (data: NewCandidateData) => {
+    // Check if a candidate with this email has an interview in progress
+    const inProgressInterview = candidates.find(
+      c => c.email.toLowerCase() === data.email.toLowerCase() && c.status === 'in-progress'
+    );
+
+    if (inProgressInterview) {
+      setExistingCandidate(inProgressInterview);
+      setNewCandidateData(data);
+      setShowWelcomeBackModal(true);
+    } else {
+      startNewInterview(data);
+    }
+  };
+
+  const handleResumeOldInterview = () => {
+    if (existingCandidate) {
+      setCurrentCandidate(existingCandidate);
+      setStep('interview');
+      setShowWelcomeBackModal(false);
+    }
+  };
+
+  const handleStartNewInterview = () => {
+    if (newCandidateData) {
+      startNewInterview(newCandidateData);
+      setShowWelcomeBackModal(false);
+    }
   };
 
   const handleBackToLanding = () => {
@@ -87,6 +125,14 @@ const IntervieweePage: React.FC = () => {
       )}
 
       {step === 'interview' && <InterviewChat />}
+
+      {showWelcomeBackModal && (
+        <WelcomeBackModal
+          onConfirm={handleResumeOldInterview}
+          onDecline={handleStartNewInterview}
+          onClose={() => setShowWelcomeBackModal(false)}
+        />
+      )}
     </div>
   );
 };

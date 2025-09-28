@@ -72,9 +72,6 @@ interface InterviewStore {
   };
   setExtractedData: (data: { name?: string; email?: string; phone?: string }) => void;
 
-  // Welcome back modal
-  showWelcomeBack: boolean;
-  setShowWelcomeBack: (show: boolean) => void;
 }
 
 export const useInterviewStore = create<InterviewStore>()(
@@ -169,9 +166,6 @@ export const useInterviewStore = create<InterviewStore>()(
 
       extractedData: {},
       setExtractedData: (data) => set({ extractedData: data }),
-
-      showWelcomeBack: false,
-      setShowWelcomeBack: (show) => set({ showWelcomeBack: show }),
     }),
     {
       name: 'interview-store',
