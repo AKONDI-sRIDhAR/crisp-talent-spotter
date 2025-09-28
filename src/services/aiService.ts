@@ -1,196 +1,99 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
 
-// NOTE: In a real application, the API key should be loaded from environment variables
-// and NEVER hardcoded in source code.
-const API_KEY = 'AIzaSyCgbyLeYVkhGNLjCUQwv3SPLaZbMPYOxaY';
+// API Key is hardcoded as requested for immediate deployment.
+const API_KEY = "AIzaSyCgbyLeYVkhGNLjCUQwv3SPLaZbMPYOxaY";
+
+// Error handling for missing key during development.
+if (!API_KEY) {
+  throw new Error("API key is missing. Please ensure it's set.");
+}
+
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 export class AIService {
   private model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-  async extractResumeData(resumeText: string) {
-    const prompt = `
-      Extract the following information from this resume text. Return ONLY a JSON object with these exact keys:
-      - name: candidate's full name
-      - email: email address
-      - phone: phone number
-      
-      If any field is not found, use null as the value.
-      
-      Resume text:
-      ${resumeText}
-    `;
-
-    try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      // Clean the response to extract JSON
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      
-      return { name: null, email: null, phone: null };
-    } catch (error) {
-      console.error('Error extracting resume data:', error);
-      return { name: null, email: null, phone: null };
-    }
-  }
-
-  // RENAMED and MERGED to align with dynamic single-question generation used in InterviewChat.tsx
-  async generateQuestion(
-    difficulty: 'easy' | 'medium' | 'hard',
-    previousQuestions: string[] // Added parameters for dynamic generation
-  ): Promise<InterviewQuestion> {
-    const timeMap = {
-      easy: 20,
-      medium: 60,
-      hard: 120,
-    };
-
-    const difficultyContext = {
-      easy: 'basic concepts, simple coding problems, or fundamental knowledge',
-      medium: 'intermediate concepts, moderate coding challenges, or problem-solving scenarios',
-      hard: 'advanced concepts, complex algorithms, system design, or challenging technical problems'
-    };
-
-    const previousQuestionsText = previousQuestions.length > 0
-      ? `\n\nCRITICAL: Do NOT repeat any of these previous questions:\n- ${previousQuestions.join('\n- ')}`
-      : '';
-
-    const prompt = `
-      Generate a single ${difficulty} level MULTIPLE CHOICE interview question for a Full Stack Developer position (React/Node.js).
-      This question should test the candidate's knowledge of ${difficultyContext[difficulty]}.
-      
-      Requirements for the question:
-      - Be specific, technical, and unique.
-      - Include exactly 4 multiple choice options.
-      - Only ONE option should be correct.
-      ${previousQuestionsText}
-
-      Return your response as a single JSON object. Do not include any other text or markdown in your response.
-
-      The object MUST have this exact format:
-      {
-        "question": "[The question text]",
-        "options": ["A) [Option A]", "B) [Option B]", "C) [Option C]", "D) [Option D]"]
-      }
-
-      To ensure variety, use this random seed in your generation process: ${Math.random()}
-    `;
-
-    try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        
-        // Clean up markdown from the question
-        const cleanQuestion = parsed.question.replace(/\*\*/g, '');
-
-        return {
-          id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          question: cleanQuestion,
-          difficulty, // Use the provided difficulty
-          timeLimit: timeMap[difficulty],
-          options: parsed.options
-        };
-      }
-      
-      throw new Error('Invalid or incomplete response format from AI');
-    } catch (error) {
-      console.error('Error generating question:', error);
-      
-      // Return a hardcoded fallback question matching the requested difficulty
-      const fallbackQuestions: Record<'easy' | 'medium' | 'hard', InterviewQuestion> = {
-        easy: { id: 'fb_e', difficulty: 'easy', question: 'What does `useState` return in React?', options: ['A) A value and a function', 'B) An object', 'C) An array', 'D) A string'], timeLimit: timeMap.easy },
-        medium: { id: 'fb_m', difficulty: 'medium', question: 'What is middleware in the context of Express.js?', options: ['A) A database driver', 'B) A templating engine', 'C) A function with access to req and res objects', 'D) A client-side library'], timeLimit: timeMap.medium },
-        hard: { id: 'fb_h', difficulty: 'hard', question: 'How would you optimize a React app that is rendering slowly?', options: ['A) Using `React.memo`', 'B) Code splitting', 'C) Virtualizing long lists', 'D) All of the above'], timeLimit: timeMap.hard },
-      };
-      
-      return fallbackQuestions[difficulty];
-    }
-  }
-
   async scoreAnswer(question: string, answer: string, difficulty: 'easy' | 'medium' | 'hard'): Promise<{ score: number; comment: string }> {
     const prompt = `
-      Score this interview answer on a scale of 0-10 and provide a brief constructive comment.
+      As an AI hiring assistant, evaluate the following answer to an interview question.
       
-      Question (${difficulty} level): ${question}
+      **Question (${difficulty} level):**
+      ${question}
       
-      Answer: ${answer}
+      **Candidate's Answer:**
+      "${answer}"
       
-      Scoring criteria:
-      - Technical accuracy (40%)
-      - Completeness of answer (30%)
-      - Communication clarity (20%)
-      - Practical understanding (10%)
+      **Instructions:**
+      1.  **Score:** Provide a score from 0 to 10 based on technical accuracy, clarity, and completeness. A score of 0 should be given for completely incorrect, irrelevant, or empty answers.
+      2.  **Comment:** Write a brief, constructive comment (1-2 sentences) explaining the reason for the score.
       
-      Consider this is a ${difficulty} level question, so adjust expectations accordingly.
+      **CRITICAL:** Return your response as a single, clean JSON object. Do not include any other text, markdown, or explanations.
       
-      Return your response in this exact JSON format:
+      **JSON Format:**
       {
         "score": [number between 0-10],
-        "comment": "[brief constructive feedback in 1-2 sentences]"
+        "comment": "[Your brief, constructive feedback]"
       }
     `;
 
-    try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          score: Math.max(0, Math.min(10, parsed.score || 0)),
-          comment: parsed.comment || 'No comment provided.'
-        };
-      }
-      
-      return { score: 5, comment: 'Unable to evaluate answer properly.' };
-    } catch (error) {
-      console.error('Error scoring answer:', error);
-      return { score: 5, comment: 'Error occurred during scoring.' };
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            const result = await this.model.generateContent(prompt);
+            const response = await result.response;
+            const text = response.text();
+
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              const parsed = JSON.parse(jsonMatch[0]);
+              return {
+                score: Math.max(0, Math.min(10, parsed.score || 0)),
+                comment: parsed.comment || 'No comment provided.'
+              };
+            }
+            throw new Error("Failed to parse JSON from AI response.");
+        } catch (error) {
+            console.error(`Error scoring answer on attempt ${attempt}:`, error);
+            if (attempt === 2) {
+                return { score: 0, comment: 'An error occurred during AI scoring after multiple attempts.' };
+            }
+            await new Promise(res => setTimeout(res, 500));
+        }
     }
+
+    return { score: 0, comment: 'An unexpected error occurred in the scoring service.' };
   }
 
   async generateFinalSummary(answers: InterviewAnswer[], candidateName: string): Promise<{ summary: string; overallScore: number }> {
-    const totalScore = answers.reduce((sum, answer) => sum + answer.aiScore, 0);
+    const totalScore = answers.reduce((sum, answer) => sum + (answer.aiScore || 0), 0);
     const averageScore = answers.length > 0 ? totalScore / answers.length : 0;
-    
+
     const answersText = answers.map((answer, index) => 
       `Question ${index + 1} (${answer.difficulty}): ${answer.question}\nAnswer: ${answer.answer}\nScore: ${answer.aiScore}/10\n`
     ).join('\n');
 
     const prompt = `
-      Generate a comprehensive interview summary for candidate ${candidateName}.
-      
-      Interview Performance:
+      As an AI hiring assistant, generate a professional interview summary for a candidate named ${candidateName}.
+      The summary should be concise (3-4 sentences) and cover the following points based on the provided interview data:
+      1.  An overall assessment of the candidate's performance.
+      2.  Mention one key strength.
+      3.  Mention one area for improvement.
+      4.  Provide a final hiring recommendation (e.g., "Strong Hire", "Good Candidate", "Needs Improvement").
+
+      Here is the interview data:
       ${answersText}
       
-      Average Score: ${averageScore.toFixed(1)}/10
-      
-      Please provide:
-      1. Overall performance assessment
-      2. Key strengths demonstrated
-      3. Areas for improvement
-      4. Recommendation (Strong Hire/Hire/Maybe/No Hire)
-      
-      Keep the summary professional, constructive, and concise (3-4 sentences).
+      Return ONLY the summary text. Do not use markdown or JSON formatting.
     `;
 
     try {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const summary = response.text().trim();
+
+      if (!summary) {
+          throw new Error("AI returned an empty summary.");
+      }
 
       return {
         summary,
@@ -199,7 +102,7 @@ export class AIService {
     } catch (error) {
       console.error('Error generating summary:', error);
       return {
-        summary: `${candidateName} completed the interview with an average score of ${averageScore.toFixed(1)}/10. Further evaluation recommended.`,
+        summary: `${candidateName} completed the interview. The AI summary could not be generated due to an error.`,
         overallScore: averageScore
       };
     }
