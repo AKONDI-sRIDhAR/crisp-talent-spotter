@@ -62,7 +62,7 @@ interface InterviewStore {
   // Interview flow
   submitAnswer: (answer: string, timeUsed: number) => void;
   nextQuestion: () => void;
-  finishInterview: () => void;
+  finishInterview: (finalCandidate: Candidate) => void;
 
   // Resume data extraction
   extractedData: {
@@ -72,9 +72,6 @@ interface InterviewStore {
   };
   setExtractedData: (data: { name?: string; email?: string; phone?: string }) => void;
 
-  // Welcome back modal
-  showWelcomeBack: boolean;
-  setShowWelcomeBack: (show: boolean) => void;
 }
 
 export const useInterviewStore = create<InterviewStore>()(
@@ -154,20 +151,13 @@ export const useInterviewStore = create<InterviewStore>()(
         }));
       },
 
-      finishInterview: () => {
-        const state = get();
-        if (!state.currentCandidate) return;
-
-        const completedCandidate = {
-          ...state.currentCandidate,
-          status: 'completed' as const,
-          endTime: new Date(),
-        };
-
+      finishInterview: (finalCandidate) => {
         set((state) => ({
-          candidates: state.candidates.map(c => 
-            c.id === completedCandidate.id ? completedCandidate : c
+          // Update the main list of candidates with the final, scored data
+          candidates: state.candidates.map(c =>
+            c.id === finalCandidate.id ? finalCandidate : c
           ),
+          // Clear the session
           currentCandidate: null,
           currentQuestion: null,
           currentMode: 'landing',
@@ -176,9 +166,6 @@ export const useInterviewStore = create<InterviewStore>()(
 
       extractedData: {},
       setExtractedData: (data) => set({ extractedData: data }),
-
-      showWelcomeBack: false,
-      setShowWelcomeBack: (show) => set({ showWelcomeBack: show }),
     }),
     {
       name: 'interview-store',

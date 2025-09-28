@@ -11,7 +11,7 @@ import { useInterviewStore } from '@/store/interviewStore';
 import { aiService } from '@/services/aiService';
 
 interface ResumeUploadProps {
-  onComplete: () => void;
+  onComplete: (data: { name: string; email: string; phone: string; resumeText: string }) => void;
 }
 
 const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
@@ -74,6 +74,10 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       });
 
       setUploadStatus('success');
+
+      // We need to pass the resume text up as well
+      handleProceed(simulatedText);
+
     } catch (err) {
       console.error('Error processing resume:', err);
       setError('Failed to process resume. Please try again.');
@@ -85,7 +89,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     setManualData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleProceed = () => {
+  const handleProceed = (resumeText: string = '') => {
     // Validate required fields
     if (!manualData.name || !manualData.email || !manualData.phone) {
       setError('Please fill in all required fields.');
@@ -101,7 +105,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
 
     // Update store with final data
     setStoreExtractedData(manualData);
-    onComplete();
+    onComplete({ ...manualData, resumeText });
   };
 
   return (
@@ -260,7 +264,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
           transition={{ delay: 0.3 }}
           className="flex justify-center"
         >
-          <Button onClick={handleProceed} size="lg" className="px-8">
+          <Button onClick={() => handleProceed()} size="lg" className="px-8">
             Start Interview
           </Button>
         </motion.div>
