@@ -112,7 +112,7 @@ const getStaticQuestion = (
 
 export class AIService {
   
-  // Method to instantiate the model for a specific API key
+  // Method to instantiate the model for a specific API key (Argument-based model management)
   private getModel(apiKey: string) {
     const genAI = new GoogleGenerativeAI(apiKey);
     return genAI.getGenerativeModel({ model: 'gemini-pro' });
@@ -295,6 +295,7 @@ export class AIService {
     // Safely calculate total score, accounting for potentially missing scores
     const totalScore = answers.reduce((sum, answer) => sum + (answer.aiScore || 0), 0);
     const averageScore = answers.length > 0 ? totalScore / answers.length : 0;
+    const overallScore = Math.round(averageScore * 10) / 10;
 
     if (!apiKey) {
       return {
