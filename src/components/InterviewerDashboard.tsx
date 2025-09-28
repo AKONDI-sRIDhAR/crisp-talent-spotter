@@ -250,6 +250,7 @@ const InterviewerDashboard: React.FC = () => {
               setResumeCandidate(null);
             }}
             candidateName={resumeCandidate.name}
+            resumeDataUrl={resumeCandidate.resumeDataUrl}
             resumeText={resumeCandidate.resumeText || 'No resume content available'}
           />
         )}

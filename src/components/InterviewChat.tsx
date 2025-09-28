@@ -35,8 +35,7 @@ const InterviewChat: React.FC = () => {
     setTimeRemaining,
     submitAnswer,
     nextQuestion,
-    finishInterview,
-    updateCandidate
+    finishInterview
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -215,17 +214,25 @@ const InterviewChat: React.FC = () => {
       let finalTotalScore = 0;
 
       for (const answer of latestCandidate.answers) {
-        const { score, comment } = await aiService.scoreAnswer(
-          answer.question,
-          answer.answer,
-          answer.difficulty
-        );
+        let score = 0;
+        let comment = 'No answer was provided before the time ran out.';
+
+        // Only call the AI if a real answer was given
+        if (answer.answer !== 'No answer selected due to time limit.') {
+          const aiResult = await aiService.scoreAnswer(
+            answer.question,
+            answer.answer,
+            answer.difficulty
+          );
+          score = aiResult.score;
+          comment = aiResult.comment;
+        }
         
         const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
 
         const scoredAnswer = {
           ...answer,
-          aiScore: score, // Keep original 0-10 score for AI feedback
+          aiScore: score,
           aiComment: comment,
         };
         
@@ -250,7 +257,6 @@ const InterviewChat: React.FC = () => {
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        // Merged the content, keeping the bolder formatting from 'main'
         content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
         timestamp: new Date()
       };
@@ -263,8 +269,6 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      
-      // Kept the cleaned-up error handling logic
       const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
       finishInterview(candidateOnError); 
       

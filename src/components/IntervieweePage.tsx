@@ -13,6 +13,7 @@ type NewCandidateData = {
   email: string;
   phone: string;
   resumeText: string;
+  resumeDataUrl: string;
 };
 
 const IntervieweePage: React.FC = () => {
@@ -45,12 +46,13 @@ const IntervieweePage: React.FC = () => {
       email: data.email,
       phone: data.phone,
       resumeText: data.resumeText,
+      resumeDataUrl: data.resumeDataUrl,
       score: 0,
       status: 'in-progress',
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
-      // Questions are generated dynamically in InterviewChat, so no need to pre-load here.
+      questions: [],
     };
 
     // If there was an old in-progress interview, mark it as completed
