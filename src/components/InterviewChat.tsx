@@ -35,7 +35,8 @@ const InterviewChat: React.FC = () => {
     setTimeRemaining,
     submitAnswer,
     nextQuestion,
-    finishInterview
+    finishInterview,
+    apiKey // RESOLUTION: Including apiKey from the store
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -63,63 +64,103 @@ const InterviewChat: React.FC = () => {
     };
   }, [timerActive, timeRemaining]);
 
-  const displayNextQuestion = () => {
+  // RESOLUTION: Dynamic question generation logic (re-implementing the intended async logic)
+  const generateNextQuestion = async () => {
+    // Get the LATEST state directly from the store to prevent stale closures
     const latestCandidate = useInterviewStore.getState().currentCandidate;
+
     if (!latestCandidate) return;
 
-    const questionIndex = latestCandidate.currentQuestionIndex;
-    if (questionIndex >= 6) {
-      finishInterviewProcess();
-      return;
-    }
-
-    const questionData = latestCandidate.questions[questionIndex];
-
-    if (!questionData) {
+    // API Key Check (Critical functionality)
+    if (!apiKey) {
       const errorMessage: Message = {
-        id: `error-no-question-${Date.now()}`,
+        id: `error-no-api-key`,
         type: 'ai',
-        content: 'Error: Could not load the next question. Please try refreshing.',
+        content: 'The API key is missing. Please set it on the homepage to begin the interview.',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
+      setIsLoading(false);
       return;
     }
 
-    setCurrentQuestion(questionData);
-    setTimeRemaining(questionData.timeLimit);
+    const questionIndex = latestCandidate.currentQuestionIndex;
 
-    const questionMessage: Message = {
-      id: `question-${questionIndex}`,
-      type: 'ai',
-      content: `Question ${questionIndex + 1}/6 (${questionData.difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
-      timestamp: new Date(),
-      isQuestion: true,
-      options: questionData.options
-    };
-
-    if (!messages.some(m => m.id === questionMessage.id)) {
-      setMessages(prev => [...prev, questionMessage]);
+    if (questionIndex >= 6) {
+      await finishInterviewProcess();
+      return;
     }
-    setTimerActive(true);
+
+    setIsLoading(true);
+
+    try {
+      const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
+      const difficulty = difficulties[latestCandidate.currentQuestionIndex];
+      
+      const previousQuestions = latestCandidate.answers.map(a => a.question);
+      
+      // Pass apiKey to the service call
+      const questionData = await aiService.generateQuestion(difficulty, previousQuestions, apiKey);
+      
+      setCurrentQuestion(questionData);
+      setTimeRemaining(questionData.timeLimit);
+      
+      const questionMessage: Message = {
+        id: `question-${latestCandidate.currentQuestionIndex}`,
+        type: 'ai',
+        content: `Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
+        timestamp: new Date(),
+        isQuestion: true,
+        options: questionData.options
+      };
+      
+      setMessages(prev => [...prev, questionMessage]);
+      setTimerActive(true);
+    } catch (error) {
+      console.error('Error generating question:', error);
+      
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        type: 'ai',
+        content: `I apologize, but an unexpected error occurred. Please try refreshing the page.`,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  // Initialize interview and listen for question index changes
   useEffect(() => {
     if (!currentCandidate) return;
 
+    // 1. Initial welcome message (only if no messages exist)
     if (messages.length === 0) {
       const welcomeMessage: Message = {
         id: 'welcome',
         type: 'ai',
-        content: `Welcome, ${currentCandidate.name}! I'm your AI interviewer. You'll be taking a technical interview with 6 questions from a pre-generated set. Each question has a time limit, and I'll provide AI-powered feedback on your answers. Let's begin!`,
+        content: `Welcome, ${currentCandidate.name}! I'm your AI interviewer. You'll be taking a technical interview with 6 questions of increasing difficulty. Each question has a time limit, and I'll provide feedback on your answers. Let's begin with your first question!`,
         timestamp: new Date()
       };
       setMessages([welcomeMessage]);
-      setTimeout(() => displayNextQuestion(), 500);
-    } else {
-      displayNextQuestion();
     }
-  }, [currentCandidate?.currentQuestionIndex]);
+
+    // 2. Start/Advance the interview by generating the next question
+    // We only want to generate a new question if the index has advanced
+    // AND we are not currently loading the very first question (messages.length > 0)
+    if (currentCandidate.currentQuestionIndex >= 0 && messages.length > 0) {
+        generateNextQuestion();
+    }
+    
+  }, [currentCandidate?.currentQuestionIndex]); // Dependency on the index ensures we try to load the next question
+
+  // Call generateNextQuestion once after the welcome message is set
+  useEffect(() => {
+    if (currentCandidate && messages.length === 1 && messages[0].id === 'welcome') {
+        generateNextQuestion();
+    }
+  }, [messages.length]); // Run only when messages.length changes to 1 (i.e., after welcome)
 
   const handleSubmitAnswer = async () => {
     if (!selectedOption || !currentQuestion || !currentCandidate) return;
@@ -166,6 +207,7 @@ const InterviewChat: React.FC = () => {
 
   const handleTimeUp = () => {
     if (!selectedOption) {
+      // Set a flag answer for time up
       setSelectedOption('No answer selected due to time limit.');
     }
     handleSubmitAnswer();
@@ -192,12 +234,14 @@ const InterviewChat: React.FC = () => {
         let score = 0;
         let comment = 'No answer was provided before the time ran out.';
 
-        // Only call the AI if a real answer was given
+        // Conditional scoring logic (Avoids API call for known time-out answers)
         if (answer.answer !== 'No answer selected due to time limit.') {
+          // Pass apiKey to the service call
           const aiResult = await aiService.scoreAnswer(
             answer.question,
             answer.answer,
-            answer.difficulty
+            answer.difficulty,
+            apiKey
           );
           score = aiResult.score;
           comment = aiResult.comment;
@@ -207,7 +251,7 @@ const InterviewChat: React.FC = () => {
 
         const scoredAnswer = {
           ...answer,
-          aiScore: score,
+          aiScore: score, // Keep original 0-10 score for AI feedback
           aiComment: comment,
         };
         
@@ -215,9 +259,11 @@ const InterviewChat: React.FC = () => {
         finalTotalScore += weightedScore;
       }
 
+      // Pass apiKey to the service call
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
-        latestCandidate.name
+        latestCandidate.name,
+        apiKey
       );
 
       const finalCandidate: Candidate = {
@@ -229,10 +275,15 @@ const InterviewChat: React.FC = () => {
         endTime: new Date()
       };
 
+      // Conditional logic for the final message content
+      const finalMessageContent = apiKey && summary && !summary.includes('disabled')
+        ? `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`
+        : `🎉 **Interview Complete!**\n\nThank you for taking the interview, ${latestCandidate.name}! Your responses have been saved.`;
+
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
+        content: finalMessageContent,
         timestamp: new Date()
       };
 
@@ -244,7 +295,14 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
+      // Using the more detailed error object for state persistence
+      const candidateOnError = {
+        ...latestCandidate,
+        status: 'completed' as const,
+        endTime: new Date(),
+        aiSummary: 'An error occurred during the final analysis.',
+        score: 0,
+      };
       finishInterview(candidateOnError); 
       
     } finally {

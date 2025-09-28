@@ -6,14 +6,14 @@ import ResumeUpload from './ResumeUpload';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
-import { questionSets } from '@/lib/preGeneratedQuestions';
+// NOTE: import { questionSets } from '@/lib/preGeneratedQuestions'; is removed, as questions are generated dynamically.
 
 type NewCandidateData = {
   name: string;
   email: string;
   phone: string;
   resumeText: string;
-  resumeDataUrl: string;
+  resumeDataUrl: string; // The correct, merged type definition
 };
 
 const IntervieweePage: React.FC = () => {
@@ -29,8 +29,8 @@ const IntervieweePage: React.FC = () => {
     addCandidate,
     updateCandidate,
     setCurrentMode,
-    questionSetIndex,
-    incrementQuestionSetIndex,
+    questionSetIndex, // Kept for minimal change, though unused
+    incrementQuestionSetIndex, // Kept for minimal change, though unused
   } = useInterviewStore();
 
   useEffect(() => {
@@ -41,9 +41,6 @@ const IntervieweePage: React.FC = () => {
   }, [currentCandidate]);
 
   const startNewInterview = (data: NewCandidateData) => {
-    // Get the next question set, cycling through the array
-    const questions = questionSets[questionSetIndex % questionSets.length];
-
     // Create a new candidate
     const newCandidate: Candidate = {
       id: `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -51,13 +48,13 @@ const IntervieweePage: React.FC = () => {
       email: data.email,
       phone: data.phone,
       resumeText: data.resumeText,
-      resumeDataUrl: data.resumeDataUrl,
+      resumeDataUrl: data.resumeDataUrl, // Correctly assigns the data URL
       score: 0,
       status: 'in-progress',
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
-      questions: questions,
+      questions: [], // RESOLUTION: Initializing questions array as empty for dynamic generation
     };
 
     // If there was an old in-progress interview, mark it as completed
@@ -67,7 +64,6 @@ const IntervieweePage: React.FC = () => {
 
     addCandidate(newCandidate);
     setCurrentCandidate(newCandidate);
-    incrementQuestionSetIndex(); // Increment the index for the next interview
     setStep('interview');
   };
 
