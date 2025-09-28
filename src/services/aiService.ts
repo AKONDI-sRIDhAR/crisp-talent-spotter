@@ -1,8 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
-// FIX: The original import below is REMOVED, and the function is defined locally to resolve the build error.
-// import { getStaticQuestion } from '../lib/staticQuestions'; 
+// NOTE: The external import for staticQuestions is removed to resolve the build error.
 
+// --- Local Fallback Implementation ---
 /**
  * Fallback implementation for getStaticQuestion.
  * This is a necessary local implementation to resolve the "Failed to resolve import" error.
@@ -97,6 +97,7 @@ const getStaticQuestion = (
     question: selectedQuestion.question,
   };
 };
+// ------------------------------------
 
 export class AIService {
   
@@ -106,6 +107,7 @@ export class AIService {
     return genAI.getGenerativeModel({ model: 'gemini-pro' });
   }
 
+  // --- Resume Extraction ---
   async extractResumeData(resumeText: string, apiKey: string) {
     if (!apiKey) return { name: null, email: null, phone: null };
     if (!resumeText) return { name: null, email: null, phone: null };
@@ -141,6 +143,7 @@ export class AIService {
     }
   }
 
+  // --- Question Generation ---
   async generateQuestion(
     difficulty: 'easy' | 'medium' | 'hard',
     previousQuestions: string[],
@@ -148,7 +151,7 @@ export class AIService {
   ): Promise<InterviewQuestion> {
     const timeMap = { easy: 20, medium: 60, hard: 120 };
 
-    // If no API key is provided, or if it's an empty string, fall back to static questions.
+    // Fallback if no API key is provided
     if (!apiKey) {
       return getStaticQuestion(difficulty, previousQuestions);
     }
@@ -213,6 +216,7 @@ export class AIService {
     }
   }
 
+  // --- Answer Scoring ---
   async scoreAnswer(question: string, answer: string, difficulty: 'easy' | 'medium' | 'hard', apiKey: string): Promise<{ score: number; comment: string }> {
     if (!apiKey) {
       return { score: 0, comment: 'AI scoring is disabled. Please set an API key.' };
@@ -273,6 +277,7 @@ export class AIService {
     return { score: 0, comment: 'An unexpected error occurred in the scoring service.' };
   }
 
+  // --- Final Summary Generation ---
   async generateFinalSummary(answers: InterviewAnswer[], candidateName: string, apiKey: string): Promise<{ summary: string; overallScore: number }> {
     // Safely calculate total score, accounting for potentially missing scores
     const totalScore = answers.reduce((sum, answer) => sum + (answer.aiScore || 0), 0);
