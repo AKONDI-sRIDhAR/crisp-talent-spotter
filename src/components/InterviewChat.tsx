@@ -86,9 +86,6 @@ const InterviewChat: React.FC = () => {
 
     const questionIndex = latestCandidate.currentQuestionIndex;
 
-    if (!latestCandidate) return;
-
-    const questionIndex = latestCandidate.currentQuestionIndex;
 
     if (questionIndex >= 6) {
       await finishInterviewProcess();
@@ -100,7 +97,7 @@ const InterviewChat: React.FC = () => {
 
     try {
       const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
-      const difficulty = difficulties[questionIndex];
+      const difficulty = difficulties[latestCandidate.currentQuestionIndex];
       
       const previousQuestions = latestCandidate.answers.map(a => a.question);
       const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
@@ -109,8 +106,10 @@ const InterviewChat: React.FC = () => {
       setTimeRemaining(questionData.timeLimit);
       
       const questionMessage: Message = {
-        id: `question-${questionIndex}`,
+        id: `question-${latestCandidate.currentQuestionIndex}`,
         type: 'ai',
+        content: `Question ${latestCandidate.currentQuestionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
+
         content: `Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
         timestamp: new Date(),
         isQuestion: true,
@@ -231,7 +230,9 @@ const InterviewChat: React.FC = () => {
         ...latestCandidate,
 
 
+
         ...currentCandidate,
+
         answers: scoredAnswers,
         score: finalTotalScore,
         aiSummary: summary,
@@ -244,7 +245,9 @@ const InterviewChat: React.FC = () => {
         type: 'ai',
         content: `🎉 Interview Complete!\n\nFinal Score: ${finalTotalScore.toFixed(1)}/15\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
 
+
         content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
+
         timestamp: new Date()
       };
 
@@ -256,14 +259,12 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
+     
+
 
       const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
-      finishInterview(candidateOnError);
-      const errorCandidate = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
-
-     
+      finishInterview(candidateOnError):
       const errorCandidate = { ...currentCandidate, status: 'completed' as const, endTime: new Date() };
-
       finishInterview(errorCandidate);
     } finally {
       setIsLoading(false);
