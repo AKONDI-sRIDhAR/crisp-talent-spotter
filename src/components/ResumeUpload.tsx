@@ -17,6 +17,7 @@ interface ResumeUploadProps {
 const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'error' | 'success'>('idle');
   const [error, setError] = useState<string>('');
+  const [resumeText, setResumeText] = useState<string>('');
   const [extractedData, setExtractedDataLocal] = useState<{ name?: string; email?: string; phone?: string }>({});
   const [manualData, setManualData] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
   
@@ -73,10 +74,8 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
         phone: extracted.phone || ''
       });
 
+      setResumeText(simulatedText); // Store the resume text in state
       setUploadStatus('success');
-
-      // We need to pass the resume text up as well
-      handleProceed(simulatedText);
 
     } catch (err) {
       console.error('Error processing resume:', err);
@@ -264,7 +263,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
           transition={{ delay: 0.3 }}
           className="flex justify-center"
         >
-          <Button onClick={() => handleProceed()} size="lg" className="px-8">
+          <Button onClick={() => handleProceed(resumeText)} size="lg" className="px-8">
             Start Interview
           </Button>
         </motion.div>

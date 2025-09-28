@@ -37,8 +37,6 @@ const IntervieweePage: React.FC = () => {
     }
   }, [currentCandidate]);
 
-  // Merged: Using the synchronous pattern for starting the interview,
-  // as question generation is now handled dynamically in InterviewChat.
   const startNewInterview = (data: NewCandidateData) => {
     // Create a new candidate
     const newCandidate: Candidate = {
@@ -52,8 +50,7 @@ const IntervieweePage: React.FC = () => {
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
-      // The 'questions' property has been omitted/initialized to [] 
-      // as the generation is dynamic (handled by InterviewChat).
+      // Questions are generated dynamically in InterviewChat, so no need to pre-load here.
     };
 
     // If there was an old in-progress interview, mark it as completed
@@ -89,7 +86,6 @@ const IntervieweePage: React.FC = () => {
     }
   };
 
-  // Merged: Reverting to synchronous function call based on synchronous startNewInterview
   const handleStartNewInterview = () => {
     if (newCandidateData) {
       startNewInterview(newCandidateData);

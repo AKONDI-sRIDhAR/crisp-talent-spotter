@@ -64,20 +64,7 @@ const InterviewChat: React.FC = () => {
     };
   }, [timerActive, timeRemaining]);
 
-  // Initialize interview
-  useEffect(() => {
-    if (currentCandidate && messages.length === 0) {
-      const welcomeMessage: Message = {
-        id: 'welcome',
-        type: 'ai',
-        content: `Welcome, ${currentCandidate.name}! I'm your AI interviewer. You'll be taking a technical interview with 6 questions of increasing difficulty. Each question has a time limit, and I'll provide feedback on your answers. Let's begin with your first question!`,
-        timestamp: new Date()
-      };
-      setMessages([welcomeMessage]);
-      generateNextQuestion();
-    }
-  }, [currentCandidate]);
-
+  // Dynamic question generation logic (Adopted from 'main' branch)
   const generateNextQuestion = async () => {
     // Get the LATEST state directly from the store to prevent stale closures
     const latestCandidate = useInterviewStore.getState().currentCandidate;
@@ -86,12 +73,10 @@ const InterviewChat: React.FC = () => {
 
     const questionIndex = latestCandidate.currentQuestionIndex;
 
-
     if (questionIndex >= 6) {
       await finishInterviewProcess();
       return;
     }
-
 
     setIsLoading(true);
 
@@ -100,6 +85,7 @@ const InterviewChat: React.FC = () => {
       const difficulty = difficulties[latestCandidate.currentQuestionIndex];
       
       const previousQuestions = latestCandidate.answers.map(a => a.question);
+      // Calls the dynamic AI service method
       const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
       
       setCurrentQuestion(questionData);
@@ -130,6 +116,37 @@ const InterviewChat: React.FC = () => {
     }
   };
 
+  // Initialize interview and listen for question index changes
+  useEffect(() => {
+    if (!currentCandidate) return;
+
+    // 1. Initial welcome message (only if no messages exist)
+    if (messages.length === 0) {
+      const welcomeMessage: Message = {
+        id: 'welcome',
+        type: 'ai',
+        content: `Welcome, ${currentCandidate.name}! I'm your AI interviewer. You'll be taking a technical interview with 6 questions of increasing difficulty. Each question has a time limit, and I'll provide feedback on your answers. Let's begin with your first question!`,
+        timestamp: new Date()
+      };
+      setMessages([welcomeMessage]);
+    }
+
+    // 2. Start/Advance the interview by generating the next question
+    // We only want to generate a new question if the index has advanced
+    // AND we are not currently loading the very first question (messages.length > 0)
+    if (currentCandidate.currentQuestionIndex >= 0 && messages.length > 0) {
+        generateNextQuestion();
+    }
+    
+  }, [currentCandidate?.currentQuestionIndex]); // Dependency on the index ensures we try to load the next question
+
+  // Call generateNextQuestion once after the welcome message is set
+  useEffect(() => {
+    if (currentCandidate && messages.length === 1 && messages[0].id === 'welcome') {
+        generateNextQuestion();
+    }
+  }, [messages.length]); // Run only when messages.length changes to 1 (i.e., after welcome)
+
   const handleSubmitAnswer = async () => {
     if (!selectedOption || !currentQuestion || !currentCandidate) return;
 
@@ -158,7 +175,7 @@ const InterviewChat: React.FC = () => {
       return;
     }
 
-    // Add transition message
+    // Add transition message (Cleaned up redundant comment)
     const transitionMessage: Message = {
       id: `transition-${Date.now()}`,
       type: 'ai',
@@ -168,12 +185,9 @@ const InterviewChat: React.FC = () => {
     
     setMessages(prev => [...prev, transitionMessage]);
     
-    // Move to next question
+    // Move to next question (This increments the index, triggering the useEffect above)
     nextQuestion();
-    setTimeout(() => {
-      generateNextQuestion();
-      setIsLoading(false);
-    }, 1500);
+    setIsLoading(false); // Reset loading state
   };
 
   const handleTimeUp = () => {
@@ -236,6 +250,7 @@ const InterviewChat: React.FC = () => {
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
+        // Merged the content, keeping the bolder formatting from 'main'
         content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
         timestamp: new Date()
       };
@@ -249,11 +264,9 @@ const InterviewChat: React.FC = () => {
     } catch (error) {
       console.error('Error finishing interview:', error);
       
-      // *** FIX APPLIED HERE ***
-      // Removed the colon (:) from the end of the function call.
-      // Retained the logic to mark the interview as completed on error.
+      // Kept the cleaned-up error handling logic
       const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
-      finishInterview(candidateOnError); // Corrected syntax
+      finishInterview(candidateOnError); 
       
     } finally {
       setIsLoading(false);
