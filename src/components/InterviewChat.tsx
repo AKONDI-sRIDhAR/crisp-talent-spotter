@@ -35,8 +35,7 @@ const InterviewChat: React.FC = () => {
     setTimeRemaining,
     submitAnswer,
     nextQuestion,
-    finishInterview,
-    updateCandidate
+    finishInterview
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -250,7 +249,6 @@ const InterviewChat: React.FC = () => {
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        // Merged the content, keeping the bolder formatting from 'main'
         content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
         timestamp: new Date()
       };
@@ -263,8 +261,6 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      
-      // Kept the cleaned-up error handling logic
       const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
       finishInterview(candidateOnError); 
       
