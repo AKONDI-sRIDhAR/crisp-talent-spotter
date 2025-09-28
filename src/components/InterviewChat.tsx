@@ -94,7 +94,13 @@ const InterviewChat: React.FC = () => {
     const latestCandidate = useInterviewStore.getState().currentCandidate;
     if (!latestCandidate) return;
 
+<<<<<<< feat/interview-enhancements
     if (latestCandidate.currentQuestionIndex >= 6) {
+=======
+    const questionIndex = latestCandidate.currentQuestionIndex;
+
+    if (questionIndex >= 6) {
+>>>>>>> main
       await finishInterviewProcess();
       return;
     }
@@ -104,6 +110,11 @@ const InterviewChat: React.FC = () => {
       const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
       const difficulty = difficulties[latestCandidate.currentQuestionIndex];
       const previousQuestions = latestCandidate.answers.map(a => a.question);
+<<<<<<< feat/interview-enhancements
+=======
+      
+      // The service now reads the API key from the environment
+>>>>>>> main
       const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
       
       setCurrentQuestion(questionData);
@@ -122,6 +133,17 @@ const InterviewChat: React.FC = () => {
       setTimerActive(true);
     } catch (error) {
       console.error('Error generating question:', error);
+<<<<<<< feat/interview-enhancements
+=======
+      
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        type: 'ai',
+        content: `I apologize, but an unexpected error occurred. This may be due to a missing or invalid API key. Please contact the administrator.`,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+>>>>>>> main
     } finally {
       setIsLoading(false);
     }
@@ -195,6 +217,7 @@ const InterviewChat: React.FC = () => {
     try {
       const scoreWeights = { easy: 0.5, medium: 2, hard: 5 };
       let finalTotalScore = 0;
+<<<<<<< feat/interview-enhancements
       const scoredAnswers = await Promise.all(
         latestCandidate.answers.map(async (answer) => {
           let score = 0, comment = 'No answer was provided.';
@@ -206,11 +229,50 @@ const InterviewChat: React.FC = () => {
           finalTotalScore += (score / 10) * scoreWeights[answer.difficulty];
           return { ...answer, aiScore: score, aiComment: comment };
         })
+=======
+
+      for (const answer of latestCandidate.answers) {
+        let score = 0;
+        let comment = 'No answer was provided before the time ran out.';
+
+        // Conditional scoring logic (Avoids API call for known time-out answers)
+        if (answer.answer !== 'No answer selected due to time limit.') {
+          // The service now reads the API key from the environment
+          const aiResult = await aiService.scoreAnswer(
+            answer.question,
+            answer.answer,
+            answer.difficulty
+          );
+          score = aiResult.score;
+          comment = aiResult.comment;
+        }
+        
+        const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
+
+        const scoredAnswer = {
+          ...answer,
+          aiScore: score, // Keep original 0-10 score for AI feedback
+          aiComment: comment,
+        };
+        
+        scoredAnswers.push(scoredAnswer);
+        finalTotalScore += weightedScore;
+      }
+
+      // The service now reads the API key from the environment
+      const { summary } = await aiService.generateFinalSummary(
+        scoredAnswers,
+        latestCandidate.name
+>>>>>>> main
       );
 
       const { summary } = await aiService.generateFinalSummary(scoredAnswers, latestCandidate.name);
       const finalCandidate: Candidate = { ...latestCandidate, answers: scoredAnswers, score: finalTotalScore, aiSummary: summary, status: 'completed', endTime: new Date() };
 
+<<<<<<< feat/interview-enhancements
+=======
+      // Conditional logic for the final message content
+>>>>>>> main
       const finalMessageContent = summary && !summary.includes('disabled')
         ? `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`
         : `🎉 **Interview Complete!**\n\nThank you for taking the interview, ${latestCandidate.name}! Your responses have been saved.`;
