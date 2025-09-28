@@ -1,15 +1,16 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
 
-// NOTE: In a real application, the API key should be loaded from environment variables
-// and NEVER hardcoded in source code.
-const API_KEY = 'AIzaSyCgbyLeYVkhGNLjCUQwv3SPLaZbMPYOxaY';
-const genAI = new GoogleGenerativeAI(API_KEY);
-
 export class AIService {
-  private model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+  private getModel(apiKey: string) {
+    if (!apiKey) {
+      throw new Error('API key is required for AI services.');
+    }
+    const genAI = new GoogleGenerativeAI(apiKey);
+    return genAI.getGenerativeModel({ model: 'gemini-pro' });
+  }
 
-  async extractResumeData(resumeText: string) {
+  async extractResumeData(resumeText: string, apiKey: string) {
     const prompt = `
       Extract the following information from this resume text. Return ONLY a JSON object with these exact keys:
       - name: candidate's full name
@@ -23,7 +24,8 @@ export class AIService {
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
+      const model = this.getModel(apiKey);
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
@@ -40,10 +42,10 @@ export class AIService {
     }
   }
 
-  // RENAMED and MERGED to align with dynamic single-question generation used in InterviewChat.tsx
   async generateQuestion(
     difficulty: 'easy' | 'medium' | 'hard',
-    previousQuestions: string[] // Added parameters for dynamic generation
+    previousQuestions: string[],
+    apiKey: string
   ): Promise<InterviewQuestion> {
     const timeMap = {
       easy: 20,
@@ -83,7 +85,8 @@ export class AIService {
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
+      const model = this.getModel(apiKey);
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
@@ -118,7 +121,7 @@ export class AIService {
     }
   }
 
-  async scoreAnswer(question: string, answer: string, difficulty: 'easy' | 'medium' | 'hard'): Promise<{ score: number; comment: string }> {
+  async scoreAnswer(question: string, answer: string, difficulty: 'easy' | 'medium' | 'hard', apiKey: string): Promise<{ score: number; comment: string }> {
     const prompt = `
       Score this interview answer on a scale of 0-10 and provide a brief constructive comment.
       
@@ -142,7 +145,8 @@ export class AIService {
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
+      const model = this.getModel(apiKey);
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
@@ -162,7 +166,7 @@ export class AIService {
     }
   }
 
-  async generateFinalSummary(answers: InterviewAnswer[], candidateName: string): Promise<{ summary: string; overallScore: number }> {
+  async generateFinalSummary(answers: InterviewAnswer[], candidateName: string, apiKey: string): Promise<{ summary: string; overallScore: number }> {
     const totalScore = answers.reduce((sum, answer) => sum + answer.aiScore, 0);
     const averageScore = answers.length > 0 ? totalScore / answers.length : 0;
     
@@ -188,7 +192,8 @@ export class AIService {
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
+      const model = this.getModel(apiKey);
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       const summary = response.text().trim();
 
