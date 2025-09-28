@@ -21,7 +21,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
   const [resumeText, setResumeText] = useState<string>('');
   const [resumeDataUrl, setResumeDataUrl] = useState<string>('');
   // RESOLUTION: Combining duplicate state definitions and ensuring imports are correct
-  const [extractedData, setExtractedDataLocal] = useState<{ name?: string; email?: string; phone?: string }>({});
+  const [extractedData, setExtractedDataLocal] = useState<{ name?: string; email?: string; phone?: string; }>({});
   const [manualData, setManualData] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
   
   const { setExtractedData: setStoreExtractedData, apiKey } = useInterviewStore();
