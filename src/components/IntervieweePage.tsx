@@ -6,13 +6,13 @@ import ResumeUpload from './ResumeUpload';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
-// NOTE: aiService import is removed as it's not used in this component after resolution
 
 type NewCandidateData = {
   name: string;
   email: string;
   phone: string;
   resumeText: string;
+  resumeDataUrl: string;
 };
 
 const IntervieweePage: React.FC = () => {
@@ -45,12 +45,13 @@ const IntervieweePage: React.FC = () => {
       email: data.email,
       phone: data.phone,
       resumeText: data.resumeText,
+      resumeDataUrl: data.resumeDataUrl,
       score: 0,
       status: 'in-progress',
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
-      // Questions are generated dynamically in InterviewChat, so no need to pre-load here.
+      questions: [], // Questions will be generated live by the AI
     };
 
     // If there was an old in-progress interview, mark it as completed

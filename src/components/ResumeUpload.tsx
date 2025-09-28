@@ -9,15 +9,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useInterviewStore } from '@/store/interviewStore';
 import { aiService } from '@/services/aiService';
+import pdfParse from 'pdf-parse';
 
 interface ResumeUploadProps {
-  onComplete: (data: { name: string; email: string; phone: string; resumeText: string }) => void;
+  onComplete: (data: { name: string; email: string; phone: string; resumeText: string; resumeDataUrl: string; }) => void;
 }
 
 const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'error' | 'success'>('idle');
   const [error, setError] = useState<string>('');
   const [resumeText, setResumeText] = useState<string>('');
+  const [resumeDataUrl, setResumeDataUrl] = useState<string>('');
   const [extractedData, setExtractedDataLocal] = useState<{ name?: string; email?: string; phone?: string }>({});
   const [manualData, setManualData] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
   
@@ -40,46 +42,44 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     setUploadStatus('uploading');
     setError('');
 
+    if (file.type.includes('docx')) {
+      setError('DOCX files are not supported yet. Please upload a PDF.');
+      setUploadStatus('error');
+      return;
+    }
+
     try {
-      // Parse the document
       setUploadStatus('processing');
       
-      // Since we can't use the document parsing tool here, we'll simulate extraction
-      // In a real implementation, you would use a PDF parsing library
-      const simulatedText = `
-        John Doe
-        Software Engineer
-        Email: john.doe@email.com
-        Phone: +1 (555) 123-4567
-        
-        Experience:
-        - Full Stack Developer at Tech Corp (2020-2023)
-        - Frontend Developer at StartupX (2018-2020)
-        
-        Skills:
-        - React, Node.js, TypeScript
-        - MongoDB, PostgreSQL
-        - AWS, Docker
-      `;
+      // Create a data URL for embedding
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setResumeDataUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
 
-      const extracted = await aiService.extractResumeData(simulatedText);
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfData = await pdfParse(Buffer.from(arrayBuffer));
+      const text = pdfData.text;
+      setResumeText(text); // Store the resume text right away
+
+      const extracted = await aiService.extractResumeData(text);
       
       setExtractedDataLocal(extracted);
       setStoreExtractedData(extracted);
       
-      // Pre-fill manual fields with extracted data
+      // Pre-fill manual fields with extracted data, if available
       setManualData({
         name: extracted.name || '',
         email: extracted.email || '',
         phone: extracted.phone || ''
       });
 
-      setResumeText(simulatedText); // Store the resume text in state
       setUploadStatus('success');
 
     } catch (err) {
       console.error('Error processing resume:', err);
-      setError('Failed to process resume. Please try again.');
+      setError('Failed to process resume. Please make sure it is a valid PDF file.');
       setUploadStatus('error');
     }
   }
@@ -88,7 +88,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     setManualData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleProceed = (resumeText: string = '') => {
+  const handleProceed = () => {
     // Validate required fields
     if (!manualData.name || !manualData.email || !manualData.phone) {
       setError('Please fill in all required fields.');
@@ -104,7 +104,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
 
     // Update store with final data
     setStoreExtractedData(manualData);
-    onComplete({ ...manualData, resumeText });
+    onComplete({ ...manualData, resumeText, resumeDataUrl });
   };
 
   return (
@@ -263,7 +263,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
           transition={{ delay: 0.3 }}
           className="flex justify-center"
         >
-          <Button onClick={() => handleProceed(resumeText)} size="lg" className="px-8">
+          <Button onClick={handleProceed} size="lg" className="px-8">
             Start Interview
           </Button>
         </motion.div>

@@ -8,6 +8,7 @@ export interface Candidate {
   phone: string;
   resumeText?: string;
   resumeFile?: File;
+  resumeDataUrl?: string;
   score: number;
   status: 'pending' | 'in-progress' | 'completed';
   startTime?: Date;

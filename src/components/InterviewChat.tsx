@@ -35,8 +35,7 @@ const InterviewChat: React.FC = () => {
     setTimeRemaining,
     submitAnswer,
     nextQuestion,
-    finishInterview,
-    updateCandidate
+    finishInterview
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -64,15 +63,11 @@ const InterviewChat: React.FC = () => {
     };
   }, [timerActive, timeRemaining]);
 
-  // Dynamic question generation logic (Adopted from 'main' branch)
   const generateNextQuestion = async () => {
-    // Get the LATEST state directly from the store to prevent stale closures
     const latestCandidate = useInterviewStore.getState().currentCandidate;
-
     if (!latestCandidate) return;
 
     const questionIndex = latestCandidate.currentQuestionIndex;
-
     if (questionIndex >= 6) {
       await finishInterviewProcess();
       return;
@@ -85,7 +80,6 @@ const InterviewChat: React.FC = () => {
       const difficulty = difficulties[latestCandidate.currentQuestionIndex];
       
       const previousQuestions = latestCandidate.answers.map(a => a.question);
-      // Calls the dynamic AI service method
       const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
       
       setCurrentQuestion(questionData);
@@ -116,36 +110,32 @@ const InterviewChat: React.FC = () => {
     }
   };
 
-  // Initialize interview and listen for question index changes
   useEffect(() => {
     if (!currentCandidate) return;
 
-    // 1. Initial welcome message (only if no messages exist)
     if (messages.length === 0) {
       const welcomeMessage: Message = {
         id: 'welcome',
         type: 'ai',
-        content: `Welcome, ${currentCandidate.name}! I'm your AI interviewer. You'll be taking a technical interview with 6 questions of increasing difficulty. Each question has a time limit, and I'll provide feedback on your answers. Let's begin with your first question!`,
+        content: `Welcome, ${currentCandidate.name}! I'm your AI interviewer. You'll be taking a technical interview with 6 dynamically generated questions. Each question has a time limit, and I'll provide AI-powered feedback on your answers. Let's begin!`,
         timestamp: new Date()
       };
       setMessages([welcomeMessage]);
     }
 
-    // 2. Start/Advance the interview by generating the next question
-    // We only want to generate a new question if the index has advanced
-    // AND we are not currently loading the very first question (messages.length > 0)
+    // Generate question when index changes and it's not the initial state
     if (currentCandidate.currentQuestionIndex >= 0 && messages.length > 0) {
-        generateNextQuestion();
+      generateNextQuestion();
     }
     
-  }, [currentCandidate?.currentQuestionIndex]); // Dependency on the index ensures we try to load the next question
+  }, [currentCandidate?.currentQuestionIndex]);
 
-  // Call generateNextQuestion once after the welcome message is set
+  // Handle the very first question generation after the welcome message
   useEffect(() => {
     if (currentCandidate && messages.length === 1 && messages[0].id === 'welcome') {
-        generateNextQuestion();
+      generateNextQuestion();
     }
-  }, [messages.length]); // Run only when messages.length changes to 1 (i.e., after welcome)
+  }, [messages.length]);
 
   const handleSubmitAnswer = async () => {
     if (!selectedOption || !currentQuestion || !currentCandidate) return;
@@ -215,17 +205,25 @@ const InterviewChat: React.FC = () => {
       let finalTotalScore = 0;
 
       for (const answer of latestCandidate.answers) {
-        const { score, comment } = await aiService.scoreAnswer(
-          answer.question,
-          answer.answer,
-          answer.difficulty
-        );
+        let score = 0;
+        let comment = 'No answer was provided before the time ran out.';
+
+        // Only call the AI if a real answer was given
+        if (answer.answer !== 'No answer selected due to time limit.') {
+          const aiResult = await aiService.scoreAnswer(
+            answer.question,
+            answer.answer,
+            answer.difficulty
+          );
+          score = aiResult.score;
+          comment = aiResult.comment;
+        }
         
         const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
 
         const scoredAnswer = {
           ...answer,
-          aiScore: score, // Keep original 0-10 score for AI feedback
+          aiScore: score,
           aiComment: comment,
         };
         
@@ -250,7 +248,6 @@ const InterviewChat: React.FC = () => {
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        // Merged the content, keeping the bolder formatting from 'main'
         content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
         timestamp: new Date()
       };
@@ -263,8 +260,6 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      
-      // Kept the cleaned-up error handling logic
       const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
       finishInterview(candidateOnError); 
       
