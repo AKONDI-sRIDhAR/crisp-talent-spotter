@@ -37,7 +37,6 @@ const IntervieweePage: React.FC = () => {
   }, [currentCandidate]);
 
   const startNewInterview = (data: NewCandidateData) => {
-
     // Create a new candidate
     const newCandidate: Candidate = {
       id: `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -45,7 +44,6 @@ const IntervieweePage: React.FC = () => {
       email: data.email,
       phone: data.phone,
       resumeText: data.resumeText,
-
       score: 0,
       status: 'in-progress',
       startTime: new Date(),
@@ -135,6 +133,6 @@ const IntervieweePage: React.FC = () => {
       )}
     </div>
   );
-};
+}
 
 export default IntervieweePage;
