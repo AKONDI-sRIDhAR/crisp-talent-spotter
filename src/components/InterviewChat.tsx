@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import Timer from '@/components/ui/timer';
-import { useInterviewStore } from '@/store/interviewStore';
+import { useInterviewStore, Candidate } from '@/store/interviewStore'; // Assuming Candidate type is exported from store
 import { aiService } from '@/services/aiService';
 
 interface Message {
@@ -64,11 +64,63 @@ const InterviewChat: React.FC = () => {
     };
   }, [timerActive, timeRemaining]);
 
+  // Dynamic question generation logic (Adopted from 'main' branch)
+  const generateNextQuestion = async () => {
+    // Get the LATEST state directly from the store to prevent stale closures
+    const latestCandidate = useInterviewStore.getState().currentCandidate;
+
+    if (!latestCandidate) return;
+
+    const questionIndex = latestCandidate.currentQuestionIndex;
+
+    if (questionIndex >= 6) {
+      await finishInterviewProcess();
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
+      const difficulty = difficulties[latestCandidate.currentQuestionIndex];
+      
+      const previousQuestions = latestCandidate.answers.map(a => a.question);
+      // Calls the dynamic AI service method
+      const questionData = await aiService.generateQuestion(difficulty, previousQuestions);
+      
+      setCurrentQuestion(questionData);
+      setTimeRemaining(questionData.timeLimit);
+      
+      const questionMessage: Message = {
+        id: `question-${latestCandidate.currentQuestionIndex}`,
+        type: 'ai',
+        content: `Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
+        timestamp: new Date(),
+        isQuestion: true,
+        options: questionData.options
+      };
+      
+      setMessages(prev => [...prev, questionMessage]);
+      setTimerActive(true);
+    } catch (error) {
+      console.error('Error generating question:', error);
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        type: 'ai',
+        content: 'I apologize, but there was an error generating the next question. Please try refreshing the page.',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Initialize interview and listen for question index changes
   useEffect(() => {
     if (!currentCandidate) return;
 
-    // Initial welcome message
+    // 1. Initial welcome message (only if no messages exist)
     if (messages.length === 0) {
       const welcomeMessage: Message = {
         id: 'welcome',
@@ -79,40 +131,21 @@ const InterviewChat: React.FC = () => {
       setMessages([welcomeMessage]);
     }
 
-    // Generate the next question whenever the index changes
-    generateNextQuestion();
-
-  }, [currentCandidate?.currentQuestionIndex]);
-
-  const generateNextQuestion = () => {
-    const latestCandidate = useInterviewStore.getState().currentCandidate;
-    if (!latestCandidate) return;
-
-    const questionIndex = latestCandidate.currentQuestionIndex;
-    const questionData = latestCandidate.questions[questionIndex];
-
-    if (!questionData) {
-      // This case should ideally not be reached if the interview ends correctly
-      console.error("No more questions available.");
-      finishInterviewProcess();
-      return;
+    // 2. Start/Advance the interview by generating the next question
+    // We only want to generate a new question if the index has advanced
+    // AND we are not currently loading the very first question (messages.length > 0)
+    if (currentCandidate.currentQuestionIndex >= 0 && messages.length > 0) {
+        generateNextQuestion();
     }
+    
+  }, [currentCandidate?.currentQuestionIndex]); // Dependency on the index ensures we try to load the next question
 
-    setCurrentQuestion(questionData);
-    setTimeRemaining(questionData.timeLimit);
-
-    const questionMessage: Message = {
-      id: questionData.id,
-      type: 'ai',
-      content: `Question ${questionIndex + 1}/6 (${questionData.difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
-      timestamp: new Date(),
-      isQuestion: true,
-      options: questionData.options,
-    };
-
-    setMessages(prev => [...prev, questionMessage]);
-    setTimerActive(true);
-  };
+  // Call generateNextQuestion once after the welcome message is set
+  useEffect(() => {
+    if (currentCandidate && messages.length === 1 && messages[0].id === 'welcome') {
+        generateNextQuestion();
+    }
+  }, [messages.length]); // Run only when messages.length changes to 1 (i.e., after welcome)
 
   const handleSubmitAnswer = async () => {
     if (!selectedOption || !currentQuestion || !currentCandidate) return;
@@ -142,7 +175,7 @@ const InterviewChat: React.FC = () => {
       return;
     }
 
-    // Add transition message and advance to the next question
+    // Add transition message (Cleaned up redundant comment)
     const transitionMessage: Message = {
       id: `transition-${Date.now()}`,
       type: 'ai',
@@ -152,9 +185,9 @@ const InterviewChat: React.FC = () => {
     
     setMessages(prev => [...prev, transitionMessage]);
     
-    // This will trigger the useEffect to generate the next question
+    // Move to next question (This increments the index, triggering the useEffect above)
     nextQuestion();
-    setIsLoading(false);
+    setIsLoading(false); // Reset loading state
   };
 
   const handleTimeUp = () => {
@@ -217,7 +250,8 @@ const InterviewChat: React.FC = () => {
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
-        content: `🎉 Interview Complete!\n\nFinal Score: ${finalTotalScore.toFixed(1)}/15\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
+        // Merged the content, keeping the bolder formatting from 'main'
+        content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
         timestamp: new Date()
       };
 
@@ -229,9 +263,11 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
-      // Even on error, we should try to finish the interview with available data
+      
+      // Kept the cleaned-up error handling logic
       const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
-      finishInterview(candidateOnError);
+      finishInterview(candidateOnError); 
+      
     } finally {
       setIsLoading(false);
     }

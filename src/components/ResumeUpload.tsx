@@ -88,7 +88,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     setManualData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleProceed = () => {
+  const handleProceed = (resumeText: string = '') => {
     // Validate required fields
     if (!manualData.name || !manualData.email || !manualData.phone) {
       setError('Please fill in all required fields.');
@@ -263,7 +263,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
           transition={{ delay: 0.3 }}
           className="flex justify-center"
         >
-          <Button onClick={handleProceed} size="lg" className="px-8">
+          <Button onClick={() => handleProceed(resumeText)} size="lg" className="px-8">
             Start Interview
           </Button>
         </motion.div>

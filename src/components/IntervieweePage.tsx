@@ -6,6 +6,7 @@ import ResumeUpload from './ResumeUpload';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
+// NOTE: aiService import is removed as it's not used in this component after resolution
 
 type NewCandidateData = {
   name: string;
@@ -49,6 +50,7 @@ const IntervieweePage: React.FC = () => {
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
+      // Questions are generated dynamically in InterviewChat, so no need to pre-load here.
     };
 
     // If there was an old in-progress interview, mark it as completed

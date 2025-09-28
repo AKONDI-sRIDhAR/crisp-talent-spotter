@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
 
+// NOTE: In a real application, the API key should be loaded from environment variables
+// and NEVER hardcoded in source code.
 const API_KEY = 'AIzaSyCgbyLeYVkhGNLjCUQwv3SPLaZbMPYOxaY';
 const genAI = new GoogleGenerativeAI(API_KEY);
 
@@ -38,7 +40,11 @@ export class AIService {
     }
   }
 
-  async generateQuestion(difficulty: 'easy' | 'medium' | 'hard', previousQuestions: string[] = []): Promise<InterviewQuestion & { options: string[] }> {
+  // RENAMED and MERGED to align with dynamic single-question generation used in InterviewChat.tsx
+  async generateQuestion(
+    difficulty: 'easy' | 'medium' | 'hard',
+    previousQuestions: string[] // Added parameters for dynamic generation
+  ): Promise<InterviewQuestion> {
     const timeMap = {
       easy: 20,
       medium: 60,
@@ -56,21 +62,18 @@ export class AIService {
       : '';
 
     const prompt = `
-      Generate a ${difficulty} level MULTIPLE CHOICE interview question for a Full Stack Developer position (React/Node.js).
+      Generate a single ${difficulty} level MULTIPLE CHOICE interview question for a Full Stack Developer position (React/Node.js).
+      This question should test the candidate's knowledge of ${difficultyContext[difficulty]}.
       
-      The question should focus on ${difficultyContext[difficulty]}.
-      
-      Requirements:
-      - Be specific and technical
-      - Be appropriate for a ${difficulty} level candidate
-      - Focus on practical knowledge and problem-solving
-      - Include exactly 4 multiple choice options (A, B, C, D)
-      - Only ONE option should be correct
-      - Should be answerable in ${timeMap[difficulty]} seconds
-      
+      Requirements for the question:
+      - Be specific, technical, and unique.
+      - Include exactly 4 multiple choice options.
+      - Only ONE option should be correct.
       ${previousQuestionsText}
-      
-      Return your response in this exact JSON format:
+
+      Return your response as a single JSON object. Do not include any other text or markdown in your response.
+
+      The object MUST have this exact format:
       {
         "question": "[The question text]",
         "options": ["A) [Option A]", "B) [Option B]", "C) [Option C]", "D) [Option D]"]
@@ -87,43 +90,31 @@ export class AIService {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
+        
+        // Clean up markdown from the question
         const cleanQuestion = parsed.question.replace(/\*\*/g, '');
 
         return {
           id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           question: cleanQuestion,
-          difficulty,
+          difficulty, // Use the provided difficulty
           timeLimit: timeMap[difficulty],
           options: parsed.options
         };
       }
       
-      throw new Error('Invalid response format');
+      throw new Error('Invalid or incomplete response format from AI');
     } catch (error) {
       console.error('Error generating question:', error);
-      // Fallback MCQ questions
-      const fallbackQuestions = {
-        easy: {
-          question: "Which of the following is the correct way to declare a constant in JavaScript?",
-          options: ["A) var x = 5;", "B) let x = 5;", "C) const x = 5;", "D) constant x = 5;"]
-        },
-        medium: {
-          question: "What is the primary purpose of React hooks?",
-          options: ["A) To manage component styling", "B) To enable state and lifecycle features in functional components", "C) To handle API requests", "D) To optimize performance"]
-        },
-        hard: {
-          question: "Which pattern is most suitable for handling real-time data synchronization in a distributed system?",
-          options: ["A) Event Sourcing", "B) CQRS", "C) Event-driven architecture with message queues", "D) All of the above"]
-        }
+      
+      // Return a hardcoded fallback question matching the requested difficulty
+      const fallbackQuestions: Record<'easy' | 'medium' | 'hard', InterviewQuestion> = {
+        easy: { id: 'fb_e', difficulty: 'easy', question: 'What does `useState` return in React?', options: ['A) A value and a function', 'B) An object', 'C) An array', 'D) A string'], timeLimit: timeMap.easy },
+        medium: { id: 'fb_m', difficulty: 'medium', question: 'What is middleware in the context of Express.js?', options: ['A) A database driver', 'B) A templating engine', 'C) A function with access to req and res objects', 'D) A client-side library'], timeLimit: timeMap.medium },
+        hard: { id: 'fb_h', difficulty: 'hard', question: 'How would you optimize a React app that is rendering slowly?', options: ['A) Using `React.memo`', 'B) Code splitting', 'C) Virtualizing long lists', 'D) All of the above'], timeLimit: timeMap.hard },
       };
       
-      return {
-        id: `fallback_${Date.now()}`,
-        question: fallbackQuestions[difficulty].question,
-        difficulty,
-        timeLimit: timeMap[difficulty],
-        options: fallbackQuestions[difficulty].options
-      };
+      return fallbackQuestions[difficulty];
     }
   }
 
