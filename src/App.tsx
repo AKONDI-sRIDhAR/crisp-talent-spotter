@@ -1,4 +1,3 @@
-import React, { useEffect, useRef } from 'react';
 import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -17,21 +16,6 @@ const App = () => {
     currentMode, 
     setCurrentMode,
   } = useInterviewStore();
-
-  const hasCheckedForIncompleteInterview = useRef(false);
-
-  // Check for incomplete interviews on app load
-  useEffect(() => {
-    if (!hasCheckedForIncompleteInterview.current &&
-        currentCandidate &&
-        currentCandidate.status === 'in-progress' && 
-        currentCandidate.answers.length > 0 && 
-        currentCandidate.answers.length < 6) {
-      setShowWelcomeBack(true);
-      hasCheckedForIncompleteInterview.current = true;
-    }
-  }, [currentCandidate, setShowWelcomeBack]);
-
 
   const renderCurrentPage = () => {
     switch (currentMode) {
