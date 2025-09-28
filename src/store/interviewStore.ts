@@ -66,14 +66,6 @@ interface InterviewStore {
   nextQuestion: () => void;
   finishInterview: (finalCandidate: Candidate) => void;
 
-  // Resume data extraction
-  extractedData: {
-    name?: string;
-    email?: string;
-    phone?: string;
-  };
-  setExtractedData: (data: { name?: string; email?: string; phone?: string }) => void;
-
   // For cycling through pre-generated question sets
   questionSetIndex: number;
   incrementQuestionSetIndex: () => void;
@@ -169,9 +161,6 @@ export const useInterviewStore = create<InterviewStore>()(
         }));
       },
 
-      extractedData: {},
-      setExtractedData: (data) => set({ extractedData: data }),
-
       questionSetIndex: 0,
       incrementQuestionSetIndex: () => set((state) => ({
         questionSetIndex: state.questionSetIndex + 1
@@ -182,7 +171,6 @@ export const useInterviewStore = create<InterviewStore>()(
       partialize: (state) => ({
         candidates: state.candidates,
         currentCandidate: state.currentCandidate,
-        extractedData: state.extractedData,
         questionSetIndex: state.questionSetIndex,
       }),
     }
