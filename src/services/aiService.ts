@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
 import { getStaticQuestion } from '../lib/staticQuestions'; // Assumed dependency for the fallback logic
 
-// NOTE: Hardcoded API key is removed.
+// NOTE: Global/Vite environment setup is removed. The key is managed via function arguments.
 
 export class AIService {
   
@@ -105,7 +105,7 @@ export class AIService {
         const cleanQuestion = parsed.question.replace(/\*\*/g, '');
 
         return {
-          id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: `q_${Date.now()}`,
           question: cleanQuestion,
           difficulty,
           timeLimit: timeMap[difficulty],
@@ -128,19 +128,8 @@ export class AIService {
 
     const prompt = `
       Score this interview answer on a scale of 0-10 and provide a brief constructive comment.
-      
       Question (${difficulty} level): ${question}
-      
       Answer: ${answer}
-      
-      Scoring criteria:
-      - Technical accuracy (40%)
-      - Completeness of answer (30%)
-      - Communication clarity (20%)
-      - Practical understanding (10%)
-      
-      Consider this is a ${difficulty} level question, so adjust expectations accordingly.
-      
       Return your response in this exact JSON format:
       {
         "score": [number between 0-10],
@@ -162,7 +151,6 @@ export class AIService {
           comment: parsed.comment || 'No comment provided.'
         };
       }
-      
       return { score: 5, comment: 'Unable to evaluate answer properly.' };
     } catch (error) {
       console.error('Error scoring answer:', error);
@@ -171,7 +159,7 @@ export class AIService {
   }
 
   async generateFinalSummary(answers: InterviewAnswer[], candidateName: string, apiKey: string): Promise<{ summary: string; overallScore: number }> {
-    // Safely calculate total score, accounting for potentially missing scores (due to no API key on some answers)
+    // Safely calculate total score, accounting for potentially missing scores
     const totalScore = answers.reduce((sum, answer) => sum + (answer.aiScore || 0), 0);
     const averageScore = answers.length > 0 ? totalScore / answers.length : 0;
 
@@ -188,18 +176,14 @@ export class AIService {
 
     const prompt = `
       Generate a comprehensive interview summary for candidate ${candidateName}.
-      
       Interview Performance:
       ${answersText}
-      
       Average Score: ${averageScore.toFixed(1)}/10
-      
       Please provide:
       1. Overall performance assessment
       2. Key strengths demonstrated
       3. Areas for improvement
       4. Recommendation (Strong Hire/Hire/Maybe/No Hire)
-      
       Keep the summary professional, constructive, and concise (3-4 sentences).
     `;
 
@@ -208,7 +192,6 @@ export class AIService {
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const summary = response.text().trim();
-
       return {
         summary,
         overallScore: Math.round(averageScore * 10) / 10

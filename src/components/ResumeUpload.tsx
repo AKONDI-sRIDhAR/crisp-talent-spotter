@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useInterviewStore } from '@/store/interviewStore';
 import { aiService } from '@/services/aiService';
-// NOTE: pdfParse import is removed as it is not browser compatible.
+// NOTE: pdfParse import is intentionally omitted as it is not browser compatible.
 
 interface ResumeUploadProps {
   onComplete: (data: { name: string; email: string; phone: string; resumeText: string }) => void;
@@ -41,7 +41,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     setUploadStatus('uploading');
     setError('');
 
-    // DOCX files are still rejected, as full parsing is not supported
+    // DOCX rejection kept for clarity. Full parsing isn't supported.
     if (file.type.includes('docx')) {
       setError('DOCX files are not supported yet. Please upload a PDF.');
       setUploadStatus('error');
@@ -51,7 +51,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     try {
       setUploadStatus('processing');
       
-      // --- RESOLUTION: Using simulated/file reader text instead of pdf-parse (to avoid build error) ---
+      // --- RESOLUTION: Using simulated text to avoid non-browser-compatible PDF parsing (pdf-parse) ---
       
       const fileReader = new FileReader();
       
@@ -87,14 +87,15 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       if (!apiKey) {
         setError('API Key is not set. Resume data extraction skipped. Please enter your details manually below.');
       } else {
-        // Assuming aiService can handle the dynamic key if needed (the service file still uses a hardcoded key)
-        extracted = await aiService.extractResumeData(text); 
+        // Pass the simulated text and the key to the AI service
+        extracted = await aiService.extractResumeData(text, apiKey); 
       }
+      // --- END RESOLUTION ---
       
       setExtractedDataLocal(extracted);
       setStoreExtractedData(extracted);
       
-      // Pre-fill manual fields with extracted data
+      // Pre-fill manual fields with extracted data, if available
       setManualData({
         name: extracted.name || '',
         email: extracted.email || '',
@@ -105,7 +106,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
 
     } catch (err) {
       console.error('Error processing resume:', err);
-      // RESOLUTION: Using the generic error message for the simpler file reading mechanism
+      // RESOLUTION: Using the generic error message for the file reading mechanism
       setError('Failed to process file. Please ensure it is a simple text-based file or check the console for details.');
       setUploadStatus('error');
     }

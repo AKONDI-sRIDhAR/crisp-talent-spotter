@@ -36,7 +36,7 @@ const InterviewChat: React.FC = () => {
     submitAnswer,
     nextQuestion,
     finishInterview,
-    apiKey // Included apiKey from useInterviewStore
+    apiKey // RESOLUTION: Including apiKey from the store
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -119,7 +119,7 @@ const InterviewChat: React.FC = () => {
     } catch (error) {
       console.error('Error generating question:', error);
       
-      // Merged: Using a generic error message, assuming API key check handled the common case.
+      // RESOLUTION: Using a generic error message
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
         type: 'ai',
@@ -267,7 +267,7 @@ const InterviewChat: React.FC = () => {
         endTime: new Date()
       };
 
-      // Merged logic for final message content
+      // RESOLUTION: Using the conditional logic for the final message content
       const finalMessageContent = apiKey && summary && !summary.includes('disabled')
         ? `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`
         : `🎉 **Interview Complete!**\n\nThank you for taking the interview, ${latestCandidate.name}! Your responses have been saved.`;
@@ -287,6 +287,7 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
+      // RESOLUTION: Using the more detailed error object for state persistence
       const candidateOnError = {
         ...latestCandidate,
         status: 'completed' as const,
