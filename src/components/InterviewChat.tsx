@@ -85,10 +85,12 @@ const InterviewChat: React.FC = () => {
     if (!latestCandidate) return;
 
     const questionIndex = latestCandidate.currentQuestionIndex;
+
     if (questionIndex >= 6) {
       await finishInterviewProcess();
       return;
     }
+
 
     setIsLoading(true);
 
@@ -148,6 +150,13 @@ const InterviewChat: React.FC = () => {
     // Submit answer to store (no scoring here)
     submitAnswer(selectedOption, timeUsed);
     
+    // Check if the interview is over
+    const latestCandidate = useInterviewStore.getState().currentCandidate;
+    if (latestCandidate && latestCandidate.answers.length >= 6) {
+      await finishInterviewProcess();
+      return;
+    }
+
     // Add transition message
     const transitionMessage: Message = {
       id: `transition-${Date.now()}`,
@@ -216,7 +225,9 @@ const InterviewChat: React.FC = () => {
 
       const finalCandidate: Candidate = {
         ...latestCandidate,
+
         ...currentCandidate,
+
         answers: scoredAnswers,
         score: finalTotalScore,
         aiSummary: summary,
@@ -239,8 +250,12 @@ const InterviewChat: React.FC = () => {
 
     } catch (error) {
       console.error('Error finishing interview:', error);
+
+      const errorCandidate = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
+
      
       const errorCandidate = { ...currentCandidate, status: 'completed' as const, endTime: new Date() };
+
       finishInterview(errorCandidate);
     } finally {
       setIsLoading(false);

@@ -75,6 +75,8 @@ export class AIService {
         "question": "[The question text]",
         "options": ["A) [Option A]", "B) [Option B]", "C) [Option C]", "D) [Option D]"]
       }
+
+      To ensure variety, use this random seed in your generation process: ${Math.random()}
     `;
 
     try {
