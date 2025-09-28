@@ -67,6 +67,10 @@ interface InterviewStore {
   nextQuestion: () => void;
   finishInterview: (finalCandidate: Candidate) => void;
 
+  // API Key Management (Added for security/functionality)
+  apiKey: string | null;
+  setApiKey: (key: string | null) => void;
+
   // Resume data extraction
   extractedData: {
     name?: string;
@@ -111,6 +115,14 @@ export const useInterviewStore = create<InterviewStore>()(
 
       timeRemaining: 0,
       setTimeRemaining: (time) => set({ timeRemaining: time }),
+
+      // API Key Management
+      apiKey: null,
+      setApiKey: (key) => set({ apiKey: key }),
+
+      // Resume Data Management
+      extractedData: {},
+      setExtractedData: (data) => set({ extractedData: data }),
 
       submitAnswer: (answer, timeUsed) => {
         const state = get();
@@ -171,9 +183,6 @@ export const useInterviewStore = create<InterviewStore>()(
         }));
       },
 
-      extractedData: {},
-      setExtractedData: (data) => set({ extractedData: data }),
-
       questionSetIndex: 0,
       incrementQuestionSetIndex: () => set((state) => ({
         questionSetIndex: state.questionSetIndex + 1
@@ -184,7 +193,8 @@ export const useInterviewStore = create<InterviewStore>()(
       partialize: (state) => ({
         candidates: state.candidates,
         currentCandidate: state.currentCandidate,
-        extractedData: state.extractedData,
+        extractedData: state.extractedData, // Ensure extracted data is persisted
+        apiKey: state.apiKey, // Ensure API key is persisted
         questionSetIndex: state.questionSetIndex,
       }),
     }

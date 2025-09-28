@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import Timer from '@/components/ui/timer';
-import { useInterviewStore, Candidate } from '@/store/interviewStore';
+import { useInterviewStore, Candidate } from '@/store/interviewStore'; // Assuming Candidate type is exported from store
 import { aiService } from '@/services/aiService';
 
 interface Message {
@@ -97,7 +97,6 @@ const InterviewChat: React.FC = () => {
 
     // API Key Check (Critical functionality)
     if (!apiKey) {
-      // If key is missing in store, treat as a local error and stop processing
       const errorMessage: Message = {
         id: `error-no-api-key`,
         type: 'ai',
@@ -108,7 +107,6 @@ const InterviewChat: React.FC = () => {
       setIsLoading(false);
       return;
     }
-
 
     const questionIndex = latestCandidate.currentQuestionIndex;
 
@@ -158,9 +156,7 @@ const InterviewChat: React.FC = () => {
   useEffect(() => {
     if (!currentCandidate) return;
     
-    // Check if the API key is locally missing (assuming VITE_GEMINI_API_KEY is not set globally
-    // and must be handled by the user input logic on the Landing Page.)
-    // If the apiKey from the store is missing, we must set the warning state.
+    // Check if the API key is locally missing (assuming the store handles fetching the key)
     if (!apiKey) {
       setApiKeyMissing(true);
       return;
@@ -240,7 +236,7 @@ const InterviewChat: React.FC = () => {
             answer.question,
             answer.answer,
             answer.difficulty,
-            apiKey! // apiKey is checked at start of finishInterviewProcess if we adopt the earlier logic
+            apiKey!
           );
           score = aiResult.score;
           comment = aiResult.comment;
@@ -258,7 +254,7 @@ const InterviewChat: React.FC = () => {
         finalTotalScore += weightedScore;
       }
 
-      // Pass apiKey to the service call
+      // Pass apiKey and resumeSummary to the service call
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
         latestCandidate.name,
@@ -285,14 +281,16 @@ const InterviewChat: React.FC = () => {
       setTimeout(() => finishInterview(finalCandidate), 5000);
     } catch (error) {
       console.error('Error finishing interview:', error);
-      const candidateOnError = { 
-        ...latestCandidate, 
-        status: 'completed' as const, 
-        endTime: new Date(), 
-        aiSummary: 'An error occurred during the final analysis.', 
-        score: 0 
+      // Using the more detailed error object for state persistence
+      const candidateOnError = {
+        ...latestCandidate,
+        status: 'completed' as const,
+        endTime: new Date(),
+        aiSummary: 'An error occurred during the final analysis.',
+        score: 0,
       };
-      finishInterview(candidateOnError);
+      finishInterview(candidateOnError); 
+      
     } finally {
       setIsLoading(false);
     }
