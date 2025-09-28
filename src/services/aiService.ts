@@ -1,17 +1,20 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
-import { getStaticQuestion } from '../lib/staticQuestions'; // Assumed dependency for the fallback logic
+
+// API Key is hardcoded as requested for immediate deployment.
+const API_KEY = "AIzaSyCgbyLeYVkhGNLjCUQwv3SPLaZbMPYOxaY";
+
+// Error handling for missing key during development.
+if (!API_KEY) {
+  throw new Error("API key is missing. Please ensure it's set.");
+}
+
+const genAI = new GoogleGenerativeAI(API_KEY);
 
 export class AIService {
-  
-  // Method to instantiate the model for a specific API key
-  private getModel(apiKey: string) {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    return genAI.getGenerativeModel({ model: 'gemini-pro' });
-  }
+  private model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-  async extractResumeData(resumeText: string, apiKey: string) {
-    if (!apiKey) return { name: null, email: null, phone: null };
+  async extractResumeData(resumeText: string) {
     if (!resumeText) return { name: null, email: null, phone: null };
 
     const prompt = `
@@ -27,8 +30,7 @@ export class AIService {
     `;
 
     try {
-      const model = this.getModel(apiKey);
-      const result = await model.generateContent(prompt);
+      const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
@@ -47,15 +49,9 @@ export class AIService {
 
   async generateQuestion(
     difficulty: 'easy' | 'medium' | 'hard',
-    previousQuestions: string[],
-    apiKey: string | null | undefined
+    previousQuestions: string[]
   ): Promise<InterviewQuestion> {
     const timeMap = { easy: 20, medium: 60, hard: 120 };
-
-    // If no API key is provided, or if it's an empty string, fall back to static questions.
-    if (!apiKey) {
-      return getStaticQuestion(difficulty, previousQuestions);
-    }
 
     const difficultyContext = {
       easy: 'basic concepts, simple coding problems, or fundamental knowledge',
@@ -67,16 +63,15 @@ export class AIService {
       ? `\n\nCRITICAL: Do NOT repeat any of these previous questions:\n- ${previousQuestions.join('\n- ')}`
       : '';
 
-    // Merged prompt for dynamic question generation
+    // A more forceful prompt to ensure unique questions.
     const prompt = `
-      You are an AI interviewer for a Full Stack Developer position (React/Node.js).
-      Generate a single, unique, ${difficulty} level MULTIPLE CHOICE interview question.
-      The question should test the candidate's knowledge of ${difficultyContext[difficulty]}.
+      You are an AI interviewer for a new, unique interview session for a Full Stack Developer (React/Node.js).
+      Your task is to generate a single, ${difficulty} level MULTIPLE CHOICE interview question.
       
-      Requirements:
-      - The question must be specific, technical, and distinct from common examples.
-      - Provide exactly 4 multiple choice options.
-      - Only ONE option can be correct.
+      **CRITICAL INSTRUCTIONS:**
+      1.  The question must be specific, technical, and distinct from common examples.
+      2.  Each question you generate must be novel and not repetitive from one session to the next.
+      3.  Provide exactly 4 multiple choice options. Only ONE option can be correct.
       ${previousQuestionsText}
 
       Return your response as a single, clean JSON object. Do not include any other text, markdown, or explanations.
@@ -87,19 +82,17 @@ export class AIService {
         "options": ["A) [Option A]", "B) [Option B]", "C) [Option C]", "D) [Option D]"]
       }
 
-      To ensure variety for different users, use this unique seed in your generation process: ${Date.now()}-${Math.random()}
+      To ensure absolute variety, use this unique seed in your generation process: ${Date.now()}-${Math.random()}
     `;
 
     try {
-      const model = this.getModel(apiKey);
-      const result = await model.generateContent(prompt);
+      const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        
         const cleanQuestion = parsed.question.replace(/\*\*/g, '');
         return {
           id: `q_${Date.now()}`,
@@ -111,67 +104,80 @@ export class AIService {
       }
       throw new Error('Invalid or incomplete response format from AI for question generation.');
     } catch (error) {
-      console.error('Error generating dynamic question, falling back to static:', error);
-      // Fallback to static question list when AI call fails
-      return getStaticQuestion(difficulty, previousQuestions);
+      console.error('Error generating question:', error);
+      return {
+        id: `fallback_${difficulty}_${Date.now()}`,
+        question: `The AI failed to generate a question. Let's try a classic: "What is your favorite ${difficulty} level concept in programming and why?"`,
+        options: ['I will explain my favorite concept.', 'I prefer not to answer.', 'I need a moment to think.', 'Let\'s move to the next question.'],
+        difficulty,
+        timeLimit: timeMap[difficulty],
+      };
     }
   }
 
-  async scoreAnswer(question: string, answer: string, difficulty: 'easy' | 'medium' | 'hard', apiKey: string): Promise<{ score: number; comment: string }> {
-    if (!apiKey) {
-      return { score: 0, comment: 'AI scoring is disabled. Please set an API key.' };
-    }
-
+  async scoreAnswer(question: string, answer: string, difficulty: 'easy' | 'medium' | 'hard'): Promise<{ score: number; comment: string }> {
     const prompt = `
-      Score this interview answer on a scale of 0-10 and provide a brief, constructive comment (1-2 sentences).
-      Question (${difficulty} level): ${question}
-      Candidate's Answer: "${answer}"
+      As an AI hiring assistant, evaluate the following answer to an interview question.
+
+      **Question (${difficulty} level):**
+      ${question}
+
+      **Candidate's Answer:**
+      "${answer}"
+
+      **Instructions:**
+      1.  **Score:** Provide a score from 0 to 10 based on technical accuracy, clarity, and completeness. A score of 0 should be given for completely incorrect, irrelevant, or empty answers.
+      2.  **Comment:** Write a brief, constructive comment (1-2 sentences) explaining the reason for the score.
+
+      **CRITICAL:** Return your response as a single, clean JSON object. Do not include any other text, markdown, or explanations.
       
-      Return your response in this exact JSON format, with no extra text or markdown:
+      **JSON Format:**
       {
         "score": [number between 0-10],
-        "comment": "[brief constructive feedback]"
+        "comment": "[Your brief, constructive feedback]"
       }
     `;
 
-    try {
-      const model = this.getModel(apiKey);
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          score: Math.max(0, Math.min(10, parsed.score || 0)),
-          comment: parsed.comment || 'No comment provided.'
-        };
-      }
-      return { score: 0, comment: 'AI was unable to parse the score.' };
-    } catch (error) {
-      console.error('Error scoring answer:', error);
-      return { score: 0, comment: 'An error occurred during AI scoring.' };
+    // Implement a retry mechanism for scoring.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+            const result = await this.model.generateContent(prompt);
+            const response = await result.response;
+            const text = response.text();
+
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              const parsed = JSON.parse(jsonMatch[0]);
+              return {
+                score: Math.max(0, Math.min(10, parsed.score || 0)),
+                comment: parsed.comment || 'No comment provided.'
+              };
+            }
+            // If parsing fails, it will throw and trigger the catch block for a retry.
+            throw new Error("Failed to parse JSON from AI response.");
+        } catch (error) {
+            console.error(`Error scoring answer on attempt ${attempt}:`, error);
+            if (attempt === 2) {
+                // If the second attempt also fails, return an error.
+                return { score: 0, comment: 'An error occurred during AI scoring after multiple attempts.' };
+            }
+            // Optional: wait a moment before retrying.
+            await new Promise(res => setTimeout(res, 500));
+        }
     }
+
+    // This should not be reached, but as a fallback.
+    return { score: 0, comment: 'An unexpected error occurred in the scoring service.' };
   }
 
-  async generateFinalSummary(answers: InterviewAnswer[], candidateName: string, apiKey: string): Promise<{ summary: string; overallScore: number }> {
-    // Safely calculate total score, accounting for potentially missing scores
+  async generateFinalSummary(answers: InterviewAnswer[], candidateName: string): Promise<{ summary: string; overallScore: number }> {
     const totalScore = answers.reduce((sum, answer) => sum + (answer.aiScore || 0), 0);
     const averageScore = answers.length > 0 ? totalScore / answers.length : 0;
 
-    if (!apiKey) {
-      return {
-        summary: 'AI summary is disabled. Please set an API key to enable this feature.',
-        overallScore: 0
-      };
-    }
-    
     const answersText = answers.map((answer, index) => 
       `Question ${index + 1} (${answer.difficulty}): ${answer.question}\nAnswer: ${answer.answer}\nScore: ${answer.aiScore}/10\n`
     ).join('\n');
 
-    // Merged prompt for a robust, concise summary
     const prompt = `
       As an AI hiring assistant, generate a professional interview summary for a candidate named ${candidateName}.
       The summary should be concise (3-4 sentences) and cover the following points based on the provided interview data:
@@ -187,8 +193,7 @@ export class AIService {
     `;
 
     try {
-      const model = this.getModel(apiKey);
-      const result = await model.generateContent(prompt);
+      const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const summary = response.text().trim();
 

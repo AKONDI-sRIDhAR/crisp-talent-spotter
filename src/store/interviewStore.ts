@@ -74,9 +74,6 @@ interface InterviewStore {
   };
   setExtractedData: (data: { name?: string; email?: string; phone?: string }) => void;
 
-  // API Key
-  apiKey: string;
-  setApiKey: (key: string) => void;
 }
 
 export const useInterviewStore = create<InterviewStore>()(
@@ -171,9 +168,6 @@ export const useInterviewStore = create<InterviewStore>()(
 
       extractedData: {},
       setExtractedData: (data) => set({ extractedData: data }),
-
-      apiKey: '',
-      setApiKey: (key) => set({ apiKey: key }),
     }),
     {
       name: 'interview-store',
@@ -181,7 +175,6 @@ export const useInterviewStore = create<InterviewStore>()(
         candidates: state.candidates,
         currentCandidate: state.currentCandidate,
         extractedData: state.extractedData,
-        apiKey: state.apiKey,
       }),
     }
   )

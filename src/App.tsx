@@ -7,7 +7,6 @@ import LandingPage from './components/LandingPage';
 import IntervieweePage from './components/IntervieweePage';
 import InterviewerDashboard from './components/InterviewerDashboard';
 import InterviewerLogin from './components/InterviewerLogin';
-import NotificationBanner from './components/NotificationBanner';
 import { useInterviewStore } from './store/interviewStore';
 
 const queryClient = new QueryClient();
@@ -39,7 +38,6 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <NotificationBanner />
         <div className="min-h-screen">
           {renderCurrentPage()}
         </div>
