@@ -2,9 +2,6 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
 import { getStaticQuestion } from '../lib/staticQuestions'; // Assumed dependency for the fallback logic
 
-// NOTE: Hardcoded API key and global initialization (genAI) are removed.
-// The API key is managed via function arguments for security.
-
 export class AIService {
   
   // Method to instantiate the model for a specific API key
@@ -147,7 +144,7 @@ export class AIService {
       }
     `;
 
-    // RESOLUTION: Implemented retry mechanism for increased scoring reliability
+    // Implemented retry mechanism for increased scoring reliability
     for (let attempt = 1; attempt <= 2; attempt++) {
         try {
             const model = this.getModel(apiKey);
@@ -171,7 +168,7 @@ export class AIService {
                 // If the second attempt also fails, return an error.
                 return { score: 0, comment: 'An error occurred during AI scoring after multiple attempts.' };
             }
-            // Optional: wait a moment before retrying (exponential backoff not strictly required here, simple delay suffices)
+            // Optional: wait a moment before retrying
             await new Promise(res => setTimeout(res, 500));
         }
     }
