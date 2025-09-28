@@ -12,6 +12,7 @@ import { aiService } from '@/services/aiService';
 
 interface ResumeUploadProps {
   onComplete: (data: { name: string; email: string; phone: string; resumeText: string }) => void;
+
 }
 
 const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
@@ -106,6 +107,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     // Update store with final data
     setStoreExtractedData(manualData);
     onComplete({ ...manualData, resumeText });
+
   };
 
   return (
