@@ -6,6 +6,8 @@ import ResumeUpload from './ResumeUpload';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
+// NOTE: questionSets import is no longer strictly necessary if questions are dynamically generated,
+// but kept for now as it's part of the original context.
 import { questionSets } from '@/lib/preGeneratedQuestions';
 
 type NewCandidateData = {
@@ -13,7 +15,7 @@ type NewCandidateData = {
   email: string;
   phone: string;
   resumeText: string;
-  resumeDataUrl: string;
+  resumeDataUrl: string; // Included from previous merge resolution
 };
 
 const IntervieweePage: React.FC = () => {
@@ -41,9 +43,10 @@ const IntervieweePage: React.FC = () => {
   }, [currentCandidate]);
 
   const startNewInterview = (data: NewCandidateData) => {
-    // Get the next question set, cycling through the array
-    const questions = questionSets[questionSetIndex % questionSets.length];
-
+    // NOTE: Questions are generated dynamically by InterviewChat using the AI service.
+    // The questionSetIndex state and increment are currently unused in the dynamic flow, 
+    // but kept in the destructured props for minimal change.
+    
     // Create a new candidate
     const newCandidate: Candidate = {
       id: `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -51,13 +54,13 @@ const IntervieweePage: React.FC = () => {
       email: data.email,
       phone: data.phone,
       resumeText: data.resumeText,
-      resumeDataUrl: data.resumeDataUrl,
+      resumeDataUrl: data.resumeDataUrl, // Included from previous merge resolution
       score: 0,
       status: 'in-progress',
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
-      questions: questions,
+      questions: [], // RESOLUTION: Initializing questions array as empty for dynamic generation
     };
 
     // If there was an old in-progress interview, mark it as completed
@@ -67,7 +70,7 @@ const IntervieweePage: React.FC = () => {
 
     addCandidate(newCandidate);
     setCurrentCandidate(newCandidate);
-    incrementQuestionSetIndex(); // Increment the index for the next interview
+    // incrementQuestionSetIndex(); // Disabled as we are not cycling pre-generated sets
     setStep('interview');
   };
 
