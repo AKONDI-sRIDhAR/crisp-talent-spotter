@@ -68,11 +68,10 @@ const InterviewChat: React.FC = () => {
 
     const questionIndex = latestCandidate.currentQuestionIndex;
     if (questionIndex >= 6) {
-      // The finish process is now called from the useEffect hook.
+      await finishInterviewProcess();
       return;
     }
 
-    // Prevent re-fetching if a question for the current index already exists in messages
     if (messages.some(m => m.id === `question-${questionIndex}`)) {
         return;
     }
@@ -86,9 +85,13 @@ const InterviewChat: React.FC = () => {
       const questionData = await aiService.generateQuestion(
         difficulty,
         previousQuestions,
-        latestCandidate.resumeText || '' // Pass resume text to the AI
+        latestCandidate.resumeText || ''
       );
-      
+
+      updateCandidate(latestCandidate.id, {
+        questions: [...latestCandidate.questions, questionData]
+      });
+
       setCurrentQuestion(questionData);
       setTimeRemaining(questionData.timeLimit);
       
@@ -117,7 +120,6 @@ const InterviewChat: React.FC = () => {
     }
   };
 
-  // This is the corrected, stable interview flow logic.
   useEffect(() => {
     if (!currentCandidate) return;
 

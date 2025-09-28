@@ -34,6 +34,36 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
 export class AIService {
   private model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
+  async extractResumeData(resumeText: string): Promise<{ name: string | null; email: string | null; phone: string | null; }> {
+    if (!resumeText) return { name: null, email: null, phone: null };
+
+    const prompt = `
+      Extract the following information from this resume text. Return ONLY a JSON object with these exact keys:
+      - name: candidate's full name
+      - email: email address
+      - phone: phone number
+      If any field is not found, use null as the value.
+      Resume text:
+      ${resumeText}
+    `;
+
+    try {
+        return await withRetry(async () => {
+            const result = await this.model.generateContent(prompt);
+            const response = await result.response;
+            const text = response.text();
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                return JSON.parse(jsonMatch[0]);
+            }
+            throw new Error("Failed to parse JSON from AI response for resume data.");
+        });
+    } catch (error) {
+        console.error('Error extracting resume data after retries:', error);
+        return { name: null, email: null, phone: null };
+    }
+  }
+
   async generateQuestion(
     difficulty: 'easy' | 'medium' | 'hard',
     previousQuestions: string[],

@@ -6,7 +6,7 @@ import ResumeUpload from './ResumeUpload';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
-import { questionSets } from '@/lib/preGeneratedQuestions';
+// NOTE: aiService import is removed as it's not used in this component after resolution
 
 type NewCandidateData = {
   name: string;
@@ -29,8 +29,6 @@ const IntervieweePage: React.FC = () => {
     addCandidate,
     updateCandidate,
     setCurrentMode,
-    questionSetIndex,
-    incrementQuestionSetIndex,
   } = useInterviewStore();
 
   useEffect(() => {
@@ -41,9 +39,6 @@ const IntervieweePage: React.FC = () => {
   }, [currentCandidate]);
 
   const startNewInterview = (data: NewCandidateData) => {
-    // Get the next question set, cycling through the array
-    const questions = questionSets[questionSetIndex % questionSets.length];
-
     // Create a new candidate
     const newCandidate: Candidate = {
       id: `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -57,7 +52,7 @@ const IntervieweePage: React.FC = () => {
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
-      questions: questions,
+      questions: [], // This will be populated by the AI
     };
 
     // If there was an old in-progress interview, mark it as completed
@@ -67,7 +62,6 @@ const IntervieweePage: React.FC = () => {
 
     addCandidate(newCandidate);
     setCurrentCandidate(newCandidate);
-    incrementQuestionSetIndex(); // Increment the index for the next interview
     setStep('interview');
   };
 

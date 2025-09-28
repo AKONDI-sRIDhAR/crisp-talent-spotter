@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useInterviewStore } from '@/store/interviewStore';
+import { aiService } from '@/services/aiService';
 import pdfParse from 'pdf-parse';
 import { Buffer } from 'buffer';
 
@@ -21,6 +23,8 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
   const [resumeDataUrl, setResumeDataUrl] = useState<string>('');
   const [manualData, setManualData] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
   
+  const { setExtractedData: setStoreExtractedData } = useInterviewStore();
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       'application/pdf': ['.pdf'],
@@ -40,7 +44,6 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
     try {
       setUploadStatus('processing');
       
-      // Create a data URL for embedding
       const reader = new FileReader();
       reader.onloadend = () => {
         setResumeDataUrl(reader.result as string);
@@ -49,7 +52,18 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
 
       const arrayBuffer = await file.arrayBuffer();
       const pdfData = await pdfParse(Buffer.from(arrayBuffer));
-      setResumeText(pdfData.text); // Store the resume text for AI analysis later
+      const text = pdfData.text;
+      setResumeText(text);
+
+      const extracted = await aiService.extractResumeData(text);
+
+      setStoreExtractedData(extracted);
+
+      setManualData({
+        name: extracted.name || '',
+        email: extracted.email || '',
+        phone: extracted.phone || ''
+      });
 
       setUploadStatus('success');
 
@@ -88,7 +102,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
       >
         <h2 className="text-3xl font-bold">Upload Your Resume</h2>
         <p className="text-muted-foreground">
-          Please upload your resume and fill in your details below to begin.
+          Upload your resume and we'll extract your information automatically.
         </p>
       </motion.div>
 
@@ -152,47 +166,63 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Enter Your Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name *</Label>
-              <Input
-                id="name"
-                value={manualData.name}
-                onChange={(e) => handleManualDataChange('name', e.target.value)}
-                placeholder="Enter your full name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={manualData.email}
-                onChange={(e) => handleManualDataChange('email', e.target.value)}
-                placeholder="Enter your email"
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number *</Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={manualData.phone}
-              onChange={(e) => {
-                const value = e.target.value.replace(/[^0-9+\-\s\(\)]/g, '');
-                handleManualDataChange('phone', value);
-              }}
-              placeholder="Enter your phone number"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {(uploadStatus === 'success' || uploadStatus === 'error') && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Verify Your Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name *</Label>
+                  <Input
+                    id="name"
+                    value={manualData.name}
+                    onChange={(e) => handleManualDataChange('name', e.target.value)}
+                    placeholder="Enter your full name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={manualData.email}
+                    onChange={(e) => handleManualDataChange('email', e.target.value)}
+                    placeholder="Enter your email"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number *</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={manualData.phone}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9+\-\s\(\)]/g, '');
+                    handleManualDataChange('phone', value);
+                  }}
+                  placeholder="Enter your phone number"
+                />
+              </div>
+              {manualData.name && (
+                <Alert>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <AlertDescription>
+                    We've pre-filled the form with information from your resume. Please verify and update as needed.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {error && (
         <Alert variant="destructive">
@@ -201,11 +231,18 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onComplete }) => {
         </Alert>
       )}
 
-      <div className="flex justify-center">
-        <Button onClick={handleProceed} size="lg" className="px-8" disabled={uploadStatus !== 'success'}>
-          Start Interview
-        </Button>
-      </div>
+      {(uploadStatus === 'success' || uploadStatus === 'error') && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="flex justify-center"
+        >
+          <Button onClick={handleProceed} size="lg" className="px-8">
+            Start Interview
+          </Button>
+        </motion.div>
+      )}
     </div>
   );
 };
