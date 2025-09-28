@@ -1,15 +1,23 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
 
-// NOTE: In a real application, the API key should be loaded from environment variables
-// and NEVER hardcoded in source code.
-const API_KEY = 'AIzaSyCgbyLeYVkhGNLjCUQwv3SPLaZbMPYOxaY';
-const genAI = new GoogleGenerativeAI(API_KEY);
+const API_KEY = import.meta.env.VITE_GOOGLE_AI_API_KEY;
+
+const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 export class AIService {
-  private model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+  private getModel() {
+    if (!genAI) {
+      console.warn("VITE_GOOGLE_AI_API_KEY is not set. AI features are disabled.");
+      return null;
+    }
+    return genAI.getGenerativeModel({ model: 'gemini-pro' });
+  }
 
   async extractResumeData(resumeText: string) {
+    const model = this.getModel();
+    if (!model) return { name: null, email: null, phone: null };
+
     const prompt = `
       Extract the following information from this resume text. Return ONLY a JSON object with these exact keys:
       - name: candidate's full name
@@ -23,11 +31,10 @@ export class AIService {
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
-      // Clean the response to extract JSON
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
@@ -40,16 +47,22 @@ export class AIService {
     }
   }
 
-  // RENAMED and MERGED to align with dynamic single-question generation used in InterviewChat.tsx
   async generateQuestion(
     difficulty: 'easy' | 'medium' | 'hard',
-    previousQuestions: string[] // Added parameters for dynamic generation
+    previousQuestions: string[]
   ): Promise<InterviewQuestion> {
-    const timeMap = {
-      easy: 20,
-      medium: 60,
-      hard: 120,
-    };
+    const model = this.getModel();
+    const timeMap = { easy: 20, medium: 60, hard: 120 };
+
+    if (!model) {
+      return {
+        id: `static_${difficulty}_${Date.now()}`,
+        question: `AI is disabled. What is a key concept in ${difficulty} web development?`,
+        options: ["Option A", "Option B", "Option C", "Option D"],
+        difficulty,
+        timeLimit: timeMap[difficulty],
+      };
+    }
 
     const difficultyContext = {
       easy: 'basic concepts, simple coding problems, or fundamental knowledge',
@@ -83,57 +96,43 @@ export class AIService {
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        
-        // Clean up markdown from the question
         const cleanQuestion = parsed.question.replace(/\*\*/g, '');
-
         return {
-          id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: `q_${Date.now()}`,
           question: cleanQuestion,
-          difficulty, // Use the provided difficulty
+          difficulty,
           timeLimit: timeMap[difficulty],
           options: parsed.options
         };
       }
-      
       throw new Error('Invalid or incomplete response format from AI');
     } catch (error) {
       console.error('Error generating question:', error);
-      
-      // Return a hardcoded fallback question matching the requested difficulty
-      const fallbackQuestions: Record<'easy' | 'medium' | 'hard', InterviewQuestion> = {
-        easy: { id: 'fb_e', difficulty: 'easy', question: 'What does `useState` return in React?', options: ['A) A value and a function', 'B) An object', 'C) An array', 'D) A string'], timeLimit: timeMap.easy },
-        medium: { id: 'fb_m', difficulty: 'medium', question: 'What is middleware in the context of Express.js?', options: ['A) A database driver', 'B) A templating engine', 'C) A function with access to req and res objects', 'D) A client-side library'], timeLimit: timeMap.medium },
-        hard: { id: 'fb_h', difficulty: 'hard', question: 'How would you optimize a React app that is rendering slowly?', options: ['A) Using `React.memo`', 'B) Code splitting', 'C) Virtualizing long lists', 'D) All of the above'], timeLimit: timeMap.hard },
+      return {
+        id: `fallback_${difficulty}_${Date.now()}`,
+        question: 'An error occurred generating a question. Please discuss your favorite programming concept.',
+        options: ['Okay', 'Will do', 'I understand', 'Let\'s proceed'],
+        difficulty,
+        timeLimit: 30,
       };
-      
-      return fallbackQuestions[difficulty];
     }
   }
 
   async scoreAnswer(question: string, answer: string, difficulty: 'easy' | 'medium' | 'hard'): Promise<{ score: number; comment: string }> {
+    const model = this.getModel();
+    if (!model) return { score: 0, comment: 'AI scoring is disabled. Please set an API key.' };
+
     const prompt = `
       Score this interview answer on a scale of 0-10 and provide a brief constructive comment.
-      
       Question (${difficulty} level): ${question}
-      
       Answer: ${answer}
-      
-      Scoring criteria:
-      - Technical accuracy (40%)
-      - Completeness of answer (30%)
-      - Communication clarity (20%)
-      - Practical understanding (10%)
-      
-      Consider this is a ${difficulty} level question, so adjust expectations accordingly.
-      
       Return your response in this exact JSON format:
       {
         "score": [number between 0-10],
@@ -142,7 +141,7 @@ export class AIService {
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
@@ -154,7 +153,6 @@ export class AIService {
           comment: parsed.comment || 'No comment provided.'
         };
       }
-      
       return { score: 5, comment: 'Unable to evaluate answer properly.' };
     } catch (error) {
       console.error('Error scoring answer:', error);
@@ -163,8 +161,16 @@ export class AIService {
   }
 
   async generateFinalSummary(answers: InterviewAnswer[], candidateName: string): Promise<{ summary: string; overallScore: number }> {
-    const totalScore = answers.reduce((sum, answer) => sum + answer.aiScore, 0);
+    const model = this.getModel();
+    const totalScore = answers.reduce((sum, answer) => sum + (answer.aiScore || 0), 0);
     const averageScore = answers.length > 0 ? totalScore / answers.length : 0;
+
+    if (!model) {
+      return {
+        summary: 'AI summary is disabled. Please set an API key to enable this feature.',
+        overallScore: 0
+      };
+    }
     
     const answersText = answers.map((answer, index) => 
       `Question ${index + 1} (${answer.difficulty}): ${answer.question}\nAnswer: ${answer.answer}\nScore: ${answer.aiScore}/10\n`
@@ -172,26 +178,21 @@ export class AIService {
 
     const prompt = `
       Generate a comprehensive interview summary for candidate ${candidateName}.
-      
       Interview Performance:
       ${answersText}
-      
       Average Score: ${averageScore.toFixed(1)}/10
-      
       Please provide:
       1. Overall performance assessment
       2. Key strengths demonstrated
       3. Areas for improvement
       4. Recommendation (Strong Hire/Hire/Maybe/No Hire)
-      
       Keep the summary professional, constructive, and concise (3-4 sentences).
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       const summary = response.text().trim();
-
       return {
         summary,
         overallScore: Math.round(averageScore * 10) / 10
@@ -199,7 +200,7 @@ export class AIService {
     } catch (error) {
       console.error('Error generating summary:', error);
       return {
-        summary: `${candidateName} completed the interview with an average score of ${averageScore.toFixed(1)}/10. Further evaluation recommended.`,
+        summary: `${candidateName} completed the interview. AI summary failed to generate.`,
         overallScore: averageScore
       };
     }
