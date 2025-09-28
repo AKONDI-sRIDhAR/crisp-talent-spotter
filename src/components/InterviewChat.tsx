@@ -86,6 +86,10 @@ const InterviewChat: React.FC = () => {
 
     const questionIndex = latestCandidate.currentQuestionIndex;
 
+    if (!latestCandidate) return;
+
+    const questionIndex = latestCandidate.currentQuestionIndex;
+
     if (questionIndex >= 6) {
       await finishInterviewProcess();
       return;
@@ -107,7 +111,7 @@ const InterviewChat: React.FC = () => {
       const questionMessage: Message = {
         id: `question-${questionIndex}`,
         type: 'ai',
-        content: `**Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)**\n\n${questionData.question}`,
+        content: `Question ${questionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
         timestamp: new Date(),
         isQuestion: true,
         options: questionData.options
@@ -226,8 +230,8 @@ const InterviewChat: React.FC = () => {
       const finalCandidate: Candidate = {
         ...latestCandidate,
 
-        ...currentCandidate,
 
+        ...currentCandidate,
         answers: scoredAnswers,
         score: finalTotalScore,
         aiSummary: summary,
@@ -238,6 +242,8 @@ const InterviewChat: React.FC = () => {
       const finalMessage: Message = {
         id: 'final',
         type: 'ai',
+        content: `🎉 Interview Complete!\n\nFinal Score: ${finalTotalScore.toFixed(1)}/15\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
+
         content: `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`,
         timestamp: new Date()
       };
@@ -251,6 +257,8 @@ const InterviewChat: React.FC = () => {
     } catch (error) {
       console.error('Error finishing interview:', error);
 
+      const candidateOnError = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
+      finishInterview(candidateOnError);
       const errorCandidate = { ...latestCandidate, status: 'completed' as const, endTime: new Date() };
 
      
