@@ -6,13 +6,14 @@ import ResumeUpload from './ResumeUpload';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
-// NOTE: aiService import is removed as it's not used in this component after resolution
+import { questionSets } from '@/lib/preGeneratedQuestions';
 
 type NewCandidateData = {
   name: string;
   email: string;
   phone: string;
   resumeText: string;
+  resumeDataUrl: string;
 };
 
 const IntervieweePage: React.FC = () => {
@@ -28,6 +29,8 @@ const IntervieweePage: React.FC = () => {
     addCandidate,
     updateCandidate,
     setCurrentMode,
+    questionSetIndex,
+    incrementQuestionSetIndex,
   } = useInterviewStore();
 
   useEffect(() => {
@@ -38,6 +41,9 @@ const IntervieweePage: React.FC = () => {
   }, [currentCandidate]);
 
   const startNewInterview = (data: NewCandidateData) => {
+    // Get the next question set, cycling through the array
+    const questions = questionSets[questionSetIndex % questionSets.length];
+
     // Create a new candidate
     const newCandidate: Candidate = {
       id: `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -45,12 +51,13 @@ const IntervieweePage: React.FC = () => {
       email: data.email,
       phone: data.phone,
       resumeText: data.resumeText,
+      resumeDataUrl: data.resumeDataUrl,
       score: 0,
       status: 'in-progress',
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
-      // Questions are generated dynamically in InterviewChat, so no need to pre-load here.
+      questions: questions,
     };
 
     // If there was an old in-progress interview, mark it as completed
@@ -60,6 +67,7 @@ const IntervieweePage: React.FC = () => {
 
     addCandidate(newCandidate);
     setCurrentCandidate(newCandidate);
+    incrementQuestionSetIndex(); // Increment the index for the next interview
     setStep('interview');
   };
 
