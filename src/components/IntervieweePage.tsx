@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import CandidateForm from './CandidateForm';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
+import PreInterviewCheck from './PreInterviewCheck';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
 // NOTE: import { questionSets } from '@/lib/preGeneratedQuestions'; is removed, as questions are generated dynamically.
 
@@ -20,7 +21,17 @@ type NewCandidateData = {
 import { toast } from "sonner";
 
 const IntervieweePage: React.FC = () => {
-  const [step, setStep] = useState<'form' | 'interview'>('form');
+  const {
+    interviewStep,
+    setInterviewStep,
+    currentCandidate,
+    setCurrentCandidate,
+    candidates,
+    addCandidate,
+    updateCandidate,
+    setCurrentMode,
+    finishInterview,
+  } = useInterviewStore();
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState(false);
   const [newCandidateData, setNewCandidateData] = useState<NewCandidateData | null>(null);
   const [existingCandidate, setExistingCandidate] = useState<Candidate | null>(null);
@@ -55,15 +66,8 @@ const IntervieweePage: React.FC = () => {
   }, [currentCandidate, finishInterview]);
 
   useEffect(() => {
-    // If there's a candidate in the store, we are in an active interview
-    if (currentCandidate && currentCandidate.status !== 'completed') {
-      setStep('interview');
-    }
-  }, [currentCandidate]);
-
-  useEffect(() => {
     // Enhanced window violation detection for interview security
-    if (step !== 'interview' || !currentCandidate || isDisqualified) {
+    if (interviewStep !== 'interview' || !currentCandidate || isDisqualified) {
       return;
     }
 
@@ -106,30 +110,11 @@ const IntervieweePage: React.FC = () => {
       processViolation();
     };
 
-    // Fullscreen exit detection
-    const handleFullscreenChange = () => {
-      if (!document.fullscreenElement) {
-        console.log('Interview violation: Fullscreen exited');
-        processViolation();
-      }
-    };
-
-    // Right-click prevention
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      return false;
-    };
-
-    // Key combination prevention (Alt+Tab, Ctrl+Tab, etc.)
+    // Simplified Key combination prevention
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent Alt+Tab, Ctrl+Tab, Windows key, F11, etc.
       if (
-        (e.altKey && e.key === 'Tab') ||
-        (e.ctrlKey && e.key === 'Tab') ||
-        e.key === 'Meta' ||
-        e.key === 'F11' ||
         (e.ctrlKey && e.shiftKey && e.key === 'I') || // Dev tools
-        (e.key === 'F12') // Dev tools
+        e.key === 'F12' // Dev tools
       ) {
         e.preventDefault();
         processViolation();
@@ -137,46 +122,20 @@ const IntervieweePage: React.FC = () => {
       }
     };
 
-    // Request fullscreen mode
-    const enterFullscreen = async () => {
-      try {
-        await document.documentElement.requestFullscreen();
-      } catch (err) {
-        console.warn('Fullscreen not supported or denied:', err);
-        toast.warning("Fullscreen Recommended", {
-          description: "For the best interview experience, please enable fullscreen mode.",
-          duration: 5000,
-        });
-      }
-    };
-
-    // Initialize security measures
-    enterFullscreen();
-
-    // Add all event listeners
+    // Add simplified event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('keydown', handleKeyDown);
 
     // Cleanup function
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('keydown', handleKeyDown);
-      
-      // Exit fullscreen when component unmounts
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(() => {});
-      }
     };
   }, [step, currentCandidate, isDisqualified, terminateInterview]);
 
-  const startNewInterview = (data: NewCandidateData) => {
-    // Create a new candidate
+  const startNewInterviewFlow = (data: NewCandidateData) => {
     const newCandidate: Candidate = {
       id: `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: data.name,
@@ -189,21 +148,19 @@ const IntervieweePage: React.FC = () => {
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
-      questions: [], // Dynamic AI-generated questions
+      questions: [],
     };
 
-    // If there was an old in-progress interview, mark it as completed
     if (existingCandidate) {
       updateCandidate(existingCandidate.id, { status: 'completed', endTime: new Date() });
     }
 
     addCandidate(newCandidate);
     setCurrentCandidate(newCandidate);
-    setStep('interview');
+    setInterviewStep('pre-interview-check');
   };
 
   const handleFormComplete = (data: NewCandidateData) => {
-    // Check if a candidate with this email has an interview in progress
     const inProgressInterview = candidates.find(
       c => c.email.toLowerCase() === data.email.toLowerCase() && c.status === 'in-progress'
     );
@@ -213,21 +170,21 @@ const IntervieweePage: React.FC = () => {
       setNewCandidateData(data);
       setShowWelcomeBackModal(true);
     } else {
-      startNewInterview(data);
+      startNewInterviewFlow(data);
     }
   };
 
   const handleResumeOldInterview = () => {
     if (existingCandidate) {
       setCurrentCandidate(existingCandidate);
-      setStep('interview');
+      setInterviewStep('interview');
       setShowWelcomeBackModal(false);
     }
   };
 
   const handleStartNewInterview = () => {
     if (newCandidateData) {
-      startNewInterview(newCandidateData);
+      startNewInterviewFlow(newCandidateData);
       setShowWelcomeBackModal(false);
     }
   };
@@ -258,7 +215,7 @@ const IntervieweePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
-      {step === 'form' && (
+      {interviewStep === 'form' && (
         <div className="relative">
           <Button
             variant="ghost"
@@ -272,7 +229,9 @@ const IntervieweePage: React.FC = () => {
         </div>
       )}
 
-      {step === 'interview' && <InterviewChat />}
+      {interviewStep === 'pre-interview-check' && <PreInterviewCheck />}
+
+      {interviewStep === 'interview' && <InterviewChat />}
 
       {showWelcomeBackModal && (
         <WelcomeBackModal

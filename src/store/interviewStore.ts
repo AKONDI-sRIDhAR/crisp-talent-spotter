@@ -52,6 +52,8 @@ interface InterviewStore {
   updateCandidate: (id: string, updates: Partial<Candidate>) => void;
 
   // Interview state
+  interviewStep: 'form' | 'pre-interview-check' | 'interview';
+  setInterviewStep: (step: 'form' | 'pre-interview-check' | 'interview') => void;
   currentQuestion: InterviewQuestion | null;
   setCurrentQuestion: (question: InterviewQuestion | null) => void;
   
@@ -67,8 +69,7 @@ interface InterviewStore {
   finishInterview: (finalCandidate: Candidate) => void;
 
   // API Key Management (Added for security/functionality)
-  apiKey: string | null;
-  setApiKey: (key: string | null) => void;
+  apiKey: string;
 
   // Resume data extraction
   extractedData: {
@@ -92,6 +93,9 @@ export const useInterviewStore = create<InterviewStore>()(
 
       currentCandidate: null,
       setCurrentCandidate: (candidate) => set({ currentCandidate: candidate }),
+
+      interviewStep: 'form',
+      setInterviewStep: (step) => set({ interviewStep: step }),
 
       candidates: [],
       addCandidate: (candidate) => set((state) => ({ 
@@ -117,7 +121,6 @@ export const useInterviewStore = create<InterviewStore>()(
 
       // API Key Management with default key
       apiKey: 'AIzaSyCgbyLeYVkhGNLjCUQwv3SPLaZbMPYOxaY',
-      setApiKey: (key) => set({ apiKey: key }),
 
       // Resume Data Management
       extractedData: {},
@@ -195,6 +198,7 @@ export const useInterviewStore = create<InterviewStore>()(
         extractedData: state.extractedData, // Ensure extracted data is persisted
         apiKey: state.apiKey, // Ensure API key is persisted
         questionSetIndex: state.questionSetIndex,
+        interviewStep: state.interviewStep, // Persist the interview step
       }),
     }
   )
