@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Users, MessageSquare, Sparkles, Timer } from 'lucide-react';
+import { Users, Bot, Sparkles, Timer, ArrowRight, Zap } from 'lucide-react';
 import LiquidEther from './LiquidEther';
 import { useInterviewStore } from '@/store/interviewStore';
 
@@ -10,48 +10,51 @@ const LandingPage: React.FC = () => {
   const { setCurrentMode } = useInterviewStore();
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background to-muted/20">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background via-background to-muted/10">
       {/* LiquidEther Background */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 opacity-30">
         <LiquidEther
           colors={['#5227FF', '#FF9FFC', '#B19EEF']}
-          mouseForce={20}
-          cursorSize={100}
+          mouseForce={15}
+          cursorSize={80}
           isViscous={false}
           viscous={30}
           iterationsViscous={32}
           iterationsPoisson={32}
-          resolution={0.5}
+          resolution={0.4}
           isBounce={false}
           autoDemo={true}
-          autoSpeed={0.5}
-          autoIntensity={2.2}
-          takeoverDuration={0.25}
-          autoResumeDelay={3000}
-          autoRampDuration={0.6}
+          autoSpeed={0.3}
+          autoIntensity={1.8}
+          takeoverDuration={0.4}
+          autoResumeDelay={4000}
+          autoRampDuration={0.8}
         />
       </div>
 
       {/* Content Overlay */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-6">
         <motion.div 
-          className="text-center space-y-8 max-w-4xl mx-auto"
-          initial={{ opacity: 0, y: 50 }}
+          className="text-center space-y-12 max-w-5xl mx-auto"
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
         >
           {/* Header */}
-          <div className="space-y-4">
+          <div className="space-y-6">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2, duration: 0.6 }}
+              className="relative inline-block"
             >
-              <Sparkles className="w-16 h-16 text-primary mx-auto mb-4" />
+              <div className="w-20 h-20 bg-gradient-to-br from-primary to-accent rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
+                <Bot className="w-10 h-10 text-primary-foreground" />
+              </div>
             </motion.div>
             
             <motion.h1 
-              className="text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent"
+              className="text-6xl md:text-8xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent tracking-tight"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.6 }}
@@ -59,115 +62,138 @@ const LandingPage: React.FC = () => {
               Crisp
             </motion.h1>
             
-            <motion.p 
-              className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto"
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.6 }}
+              className="space-y-4"
             >
-              AI-Powered Interview Assistant
-            </motion.p>
-            
-            <motion.p 
-              className="text-lg text-muted-foreground/80 max-w-3xl mx-auto"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.6 }}
-            >
-              Experience the future of technical interviews with dynamic AI-generated questions, 
-              real-time scoring, and intelligent candidate evaluation.
-            </motion.p>
+              <p className="text-2xl md:text-3xl font-medium text-foreground/90">
+                AI Technical Interview Platform
+              </p>
+              
+              <p className="text-lg text-muted-foreground/80 max-w-2xl mx-auto leading-relaxed">
+                Experience next-generation technical assessments with dynamic AI questions, 
+                real-time evaluation, and intelligent candidate insights.
+              </p>
+            </motion.div>
           </div>
 
           {/* Mode Selection Cards */}
           <motion.div 
-            className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto"
-            initial={{ opacity: 0, y: 30 }}
+            className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto"
+            initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.6 }}
           >
             {/* Interviewee Card */}
-            <Card className="group hover:shadow-2xl transition-all duration-300 bg-card/80 backdrop-blur-sm border-border/50 hover:border-primary/50">
-              <CardContent className="p-8 text-center space-y-4">
-                <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <MessageSquare className="w-8 h-8 text-primary" />
-                </div>
-                
-                <h3 className="text-2xl font-bold">Interviewee</h3>
-                
-                <p className="text-muted-foreground">
-                  Take your technical interview with AI-generated questions and real-time feedback.
-                </p>
-                
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <div className="flex items-center justify-center gap-2">
-                    <Timer className="w-4 h-4" />
-                    <span>Timed Questions</span>
+            <motion.div
+              whileHover={{ y: -8, scale: 1.02 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+            >
+              <Card className="glass-card hover-lift glow-on-hover h-full group cursor-pointer">
+                <CardContent className="p-8 text-center space-y-6 h-full flex flex-col">
+                  <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center group-hover:scale-110 transition-all duration-300 shadow-lg">
+                    <Bot className="w-8 h-8 text-primary-foreground" />
                   </div>
-                  <div className="text-xs opacity-75">6 Questions • Easy → Medium → Hard</div>
-                </div>
-                
-                <Button 
-                  onClick={() => setCurrentMode('interviewee')}
-                  className="w-full mt-6"
-                  size="lg"
-                >
-                  Start Interview
-                </Button>
-              </CardContent>
-            </Card>
+                  
+                  <div className="space-y-3">
+                    <h3 className="text-2xl font-bold">Take Interview</h3>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Experience AI-powered technical assessment with dynamic questions and instant feedback.
+                    </p>
+                  </div>
+                  
+                  <div className="flex-1 flex flex-col justify-center space-y-3 text-sm text-muted-foreground">
+                    <div className="flex items-center justify-center gap-2">
+                      <Zap className="w-4 h-4 text-primary" />
+                      <span>Dynamic AI Questions</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2">
+                      <Timer className="w-4 h-4 text-primary" />
+                      <span>Real-time Evaluation</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground/60 pt-2">
+                      6 Questions • Progressive Difficulty • 15-20 minutes
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    onClick={() => setCurrentMode('interviewee')}
+                    className="w-full mt-6 h-12 text-lg font-medium bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 shadow-lg group-hover:shadow-2xl"
+                    size="lg"
+                  >
+                    Start Interview
+                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
 
             {/* Interviewer Card */}
-            <Card className="group hover:shadow-2xl transition-all duration-300 bg-card/80 backdrop-blur-sm border-border/50 hover:border-accent/50">
-              <CardContent className="p-8 text-center space-y-4">
-                <div className="w-16 h-16 mx-auto rounded-full bg-accent/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <Users className="w-8 h-8 text-accent" />
-                </div>
-                
-                <h3 className="text-2xl font-bold">Interviewer</h3>
-                
-                <p className="text-muted-foreground">
-                  View candidate performance, scores, and AI-generated summaries.
-                </p>
-                
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <div className="flex items-center justify-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    <span>AI Analytics</span>
+            <motion.div
+              whileHover={{ y: -8, scale: 1.02 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+            >
+              <Card className="glass-card hover-lift glow-on-hover h-full group cursor-pointer">
+                <CardContent className="p-8 text-center space-y-6 h-full flex flex-col">
+                  <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center group-hover:scale-110 transition-all duration-300 shadow-lg">
+                    <Users className="w-8 h-8 text-primary-foreground" />
                   </div>
-                  <div className="text-xs opacity-75">Scores • Summaries • Chat History</div>
-                </div>
-                
-                <Button 
-                  variant="outline"
-                  onClick={() => setCurrentMode('interviewer-login')}
-                  className="w-full mt-6 border-accent/50 hover:bg-accent/10"
-                  size="lg"
-                >
-                  View Dashboard
-                </Button>
-              </CardContent>
-            </Card>
+                  
+                  <div className="space-y-3">
+                    <h3 className="text-2xl font-bold">View Results</h3>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Access comprehensive candidate analytics, scores, and AI-generated performance summaries.
+                    </p>
+                  </div>
+                  
+                  <div className="flex-1 flex flex-col justify-center space-y-3 text-sm text-muted-foreground">
+                    <div className="flex items-center justify-center gap-2">
+                      <Sparkles className="w-4 h-4 text-accent" />
+                      <span>AI Performance Analysis</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2">
+                      <Users className="w-4 h-4 text-accent" />
+                      <span>Candidate Dashboard</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground/60 pt-2">
+                      Detailed Scores • Interview History • Export Reports
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    variant="outline"
+                    onClick={() => setCurrentMode('interviewer-login')}
+                    className="w-full mt-6 h-12 text-lg font-medium border-accent/30 text-accent hover:bg-accent/10 hover:border-accent/50 transition-all duration-300 shadow-lg group-hover:shadow-2xl"
+                    size="lg"
+                  >
+                    Access Dashboard
+                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
           </motion.div>
 
-          {/* Features Preview */}
+          {/* Features Footer */}
           <motion.div 
-            className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground/80"
+            className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground/70 pt-8"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.8, duration: 0.6 }}
+            transition={{ delay: 0.9, duration: 0.6 }}
           >
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              <span>AI-Powered Questions</span>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/20 backdrop-blur-sm">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span>AI-Powered Assessment</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Timer className="w-4 h-4" />
-              <span>Real-time Scoring</span>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/20 backdrop-blur-sm">
+              <Timer className="w-4 h-4 text-primary" />
+              <span>Instant Scoring</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              <span>Candidate Analytics</span>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/20 backdrop-blur-sm">
+              <Users className="w-4 h-4 text-primary" />
+              <span>Detailed Analytics</span>
             </div>
           </motion.div>
         </motion.div>

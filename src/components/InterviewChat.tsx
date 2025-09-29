@@ -18,43 +18,11 @@ interface Message {
   options?: string[];
 }
 
-const ApiKeySetupGuide: React.FC = () => (
-  <div className="flex justify-center p-4">
-    <Card className="max-w-2xl bg-orange-100 dark:bg-orange-900/30 border-orange-500">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-3 text-orange-700 dark:text-orange-300">
-          <AlertTriangle className="w-6 h-6" />
-          Action Required: Set Up Your API Key
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-6 pt-0">
-        <p className="text-sm text-muted-foreground mb-4">
-          To enable the AI-powered features of this application, you need to provide a Google AI API key.
-        </p>
-        <div className="space-y-3 text-sm bg-background/50 p-4 rounded-lg border">
-          <p>
-            <strong>Step 1:</strong> Create a new file named <code>.env.local</code> in the main project folder (the same folder that contains <code>package.json</code>).
-          </p>
-          <p>
-            <strong>Step 2:</strong> Open the <code>.env.local</code> file and add the following line, replacing <code>YOUR_API_KEY_HERE</code> with your actual Google AI API key:
-          </p>
-          <pre className="p-2 bg-muted rounded-md text-xs overflow-x-auto">
-            <code>VITE_GEMINI_API_KEY=YOUR_API_KEY_HERE</code>
-          </pre>
-          <p>
-            <strong>Step 3:</strong> Stop the development server (if it's running) and restart it with <code>bun run dev</code> for the changes to take effect.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  </div>
-);
-
+// Remove unused component
 const InterviewChat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedOption, setSelectedOption] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKeyMissing, setApiKeyMissing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout>();
 
@@ -69,7 +37,7 @@ const InterviewChat: React.FC = () => {
     submitAnswer,
     nextQuestion,
     finishInterview,
-    apiKey // RESOLUTION: Including apiKey from the store
+    apiKey
   } = useInterviewStore();
 
   const scrollToBottom = () => {
@@ -93,20 +61,7 @@ const InterviewChat: React.FC = () => {
 
   const generateNextQuestion = async () => {
     const latestCandidate = useInterviewStore.getState().currentCandidate;
-    if (!latestCandidate) return;
-
-    // API Key Check (Critical functionality)
-    if (!apiKey) {
-      const errorMessage: Message = {
-        id: `error-no-api-key`,
-        type: 'ai',
-        content: 'The API key is missing. Please set it on the homepage to begin the interview.',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-      setIsLoading(false);
-      return;
-    }
+    if (!latestCandidate || !apiKey) return;
 
     const questionIndex = latestCandidate.currentQuestionIndex;
 
@@ -121,7 +76,6 @@ const InterviewChat: React.FC = () => {
       const difficulty = difficulties[latestCandidate.currentQuestionIndex];
       const previousQuestions = latestCandidate.answers.map(a => a.question);
       
-      // Pass apiKey to the service call
       const questionData = await aiService.generateQuestion(difficulty, previousQuestions, apiKey);
       
       setCurrentQuestion(questionData);
@@ -144,7 +98,7 @@ const InterviewChat: React.FC = () => {
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
         type: 'ai',
-        content: `I apologize, but an unexpected error occurred. This may be due to a missing or invalid API key. Please contact the administrator.`,
+        content: `I apologize, but there was an error generating the next question. Please try refreshing the page.`,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -155,13 +109,6 @@ const InterviewChat: React.FC = () => {
 
   useEffect(() => {
     if (!currentCandidate) return;
-    
-    // Check if the API key is locally missing (assuming the store handles fetching the key)
-    if (!apiKey) {
-      setApiKeyMissing(true);
-      return;
-    }
-    setApiKeyMissing(false);
 
     if (messages.length === 0) {
       const welcomeMessage: Message = {
@@ -176,13 +123,13 @@ const InterviewChat: React.FC = () => {
     if (currentCandidate.currentQuestionIndex >= 0 && messages.length > 0) {
       generateNextQuestion();
     }
-  }, [currentCandidate?.currentQuestionIndex, apiKey]); // Depend on apiKey to restart if user enters it
+  }, [currentCandidate?.currentQuestionIndex]);
 
   useEffect(() => {
-    if (currentCandidate && !apiKeyMissing && messages.length === 1 && messages[0].id === 'welcome') {
+    if (currentCandidate && messages.length === 1 && messages[0].id === 'welcome') {
       generateNextQuestion();
     }
-  }, [messages.length, apiKeyMissing]);
+  }, [messages.length]);
 
   const handleSubmitAnswer = async () => {
     if (!selectedOption || !currentQuestion || !currentCandidate) return;
@@ -254,11 +201,10 @@ const InterviewChat: React.FC = () => {
         finalTotalScore += weightedScore;
       }
 
-      // Pass apiKey and resumeSummary to the service call
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
         latestCandidate.name,
-        latestCandidate.resumeSummary || null, // Pass resume summary from candidate state
+        latestCandidate.resumeSummary || null,
         apiKey!
       );
 
@@ -271,7 +217,6 @@ const InterviewChat: React.FC = () => {
         endTime: new Date()
       };
 
-      // Conditional logic for the final message content
       const finalMessageContent = summary && !summary.includes('disabled')
         ? `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`
         : `🎉 **Interview Complete!**\n\nThank you for taking the interview, ${latestCandidate.name}! Your responses have been saved.`;
@@ -298,61 +243,105 @@ const InterviewChat: React.FC = () => {
 
   if (!currentCandidate) return null;
 
-  if (apiKeyMissing) {
-    return (
-      <div className="flex flex-col h-screen bg-gradient-to-br from-background to-muted/20">
-        <div className="border-b bg-card/50 backdrop-blur-sm p-4">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
-            <h2 className="text-xl font-bold">Initial Setup Required</h2>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          <ApiKeySetupGuide />
-        </div>
-      </div>
-    );
-  }
-
   const progress = (currentCandidate.currentQuestionIndex / 6) * 100;
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-background to-muted/20">
-      <div className="border-b bg-card/50 backdrop-blur-sm p-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold">{currentCandidate.name}</h2>
-            <p className="text-sm text-muted-foreground">Technical Interview</p>
-          </div>
+    <div className="flex flex-col h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      {/* Header */}
+      <div className="border-b bg-card/50 backdrop-blur-xl border-border/50 shadow-lg">
+        <div className="max-w-4xl mx-auto flex items-center justify-between p-4">
           <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-sm font-medium">Question {Math.min(currentCandidate.currentQuestionIndex + 1, 6)}/6</div>
-              <Progress value={progress} className="w-32" />
+            <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center">
+              <User className="w-6 h-6 text-primary-foreground" />
             </div>
-            {currentQuestion && timerActive && <Timer timeRemaining={timeRemaining} totalTime={currentQuestion.timeLimit} difficulty={currentQuestion.difficulty} onTimeUp={handleTimeUp} isActive={timerActive} />}
+            <div>
+              <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                {currentCandidate.name}
+              </h2>
+              <p className="text-sm text-muted-foreground">AI Technical Interview</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <div className="text-sm font-medium mb-1">
+                Question {Math.min(currentCandidate.currentQuestionIndex + 1, 6)}/6
+              </div>
+              <Progress value={progress} className="w-32 h-2" />
+            </div>
+            {currentQuestion && timerActive && (
+              <Timer 
+                timeRemaining={timeRemaining} 
+                totalTime={currentQuestion.timeLimit} 
+                difficulty={currentQuestion.difficulty} 
+                onTimeUp={handleTimeUp} 
+                isActive={timerActive} 
+              />
+            )}
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-4xl mx-auto space-y-4">
-          <AnimatePresence>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <AnimatePresence mode="popLayout">
             {messages.map((message) => (
-              <motion.div key={message.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className={`flex gap-3 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <Card className={`max-w-2xl ${message.type === 'user' ? 'bg-primary text-primary-foreground' : 'bg-card/80 backdrop-blur-sm'}`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      {message.type === 'ai' ? <Bot className="w-6 h-6 text-primary flex-shrink-0 mt-1" /> : <User className="w-6 h-6 text-primary-foreground flex-shrink-0 mt-1" />}
-                      <div className="flex-1">
-                        <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
+              <motion.div 
+                key={message.id} 
+                initial={{ opacity: 0, y: 20 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                exit={{ opacity: 0, y: -20 }} 
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className={`flex gap-4 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <Card className={`
+                  max-w-2xl glass-card shadow-xl hover-lift transition-all duration-300
+                  ${message.type === 'user' 
+                    ? 'bg-gradient-to-br from-primary to-accent text-primary-foreground border-primary/20' 
+                    : 'bg-card/90 backdrop-blur-lg border-border/30'
+                  }
+                `}>
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4">
+                      {message.type === 'ai' ? (
+                        <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                          <Bot className="w-4 h-4 text-primary-foreground" />
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                          <User className="w-4 h-4 text-primary-foreground" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                          {message.content}
+                        </div>
                         {message.isQuestion && message.options && currentQuestion && timerActive && (
-                          <div className="mt-4 space-y-2">
+                          <div className="mt-6 space-y-3">
                             {message.options.map((option, index) => (
-                              <button key={index} onClick={() => setSelectedOption(option)} className={`w-full text-left p-3 rounded-lg border transition-all ${selectedOption === option ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:border-primary/50 hover:bg-muted/50'}`}>
+                              <motion.button 
+                                key={index}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => setSelectedOption(option)} 
+                                className={`
+                                  w-full text-left p-4 rounded-xl border transition-all duration-300 font-medium
+                                  ${selectedOption === option 
+                                    ? 'border-primary bg-primary/10 text-primary shadow-lg ring-2 ring-primary/20' 
+                                    : 'border-border/50 hover:border-primary/50 hover:bg-muted/30 hover:shadow-md'
+                                  }
+                                `}
+                              >
                                 {option}
-                              </button>
+                              </motion.button>
                             ))}
                           </div>
                         )}
-                        <div className={`text-xs mt-2 ${message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{message.timestamp.toLocaleTimeString()}</div>
+                        <div className={`text-xs mt-3 ${
+                          message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                        }`}>
+                          {message.timestamp.toLocaleTimeString()}
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -360,13 +349,21 @@ const InterviewChat: React.FC = () => {
               </motion.div>
             ))}
           </AnimatePresence>
+
+          {/* Loading indicator */}
           {isLoading && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-              <Card className="bg-card/80 backdrop-blur-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <Bot className="w-6 h-6 text-primary animate-pulse" />
-                    <div className="flex space-x-1">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              className="flex justify-start"
+            >
+              <Card className="glass-card shadow-xl">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center">
+                      <Bot className="w-4 h-4 text-primary-foreground animate-pulse" />
+                    </div>
+                    <div className="flex space-x-2">
                       <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0ms]"></div>
                       <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:150ms]"></div>
                       <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:300ms]"></div>
@@ -379,15 +376,26 @@ const InterviewChat: React.FC = () => {
           <div ref={messagesEndRef} />
         </div>
       </div>
+
+      {/* Submit button */}
       {currentQuestion && timerActive && selectedOption && (
-        <div className="border-t bg-card/50 backdrop-blur-sm p-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="border-t bg-card/50 backdrop-blur-xl border-border/50 p-6"
+        >
           <div className="max-w-4xl mx-auto flex justify-center">
-            <Button onClick={handleSubmitAnswer} disabled={!selectedOption || isLoading} size="lg" className="px-8">
-              <CheckCircle2 className="w-4 h-4 mr-2" />
+            <Button 
+              onClick={handleSubmitAnswer} 
+              disabled={!selectedOption || isLoading} 
+              size="lg" 
+              className="px-8 py-3 text-lg font-medium bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105"
+            >
+              <CheckCircle2 className="w-5 h-5 mr-2" />
               Submit Answer
             </Button>
           </div>
-        </div>
+        </motion.div>
       )}
     </div>
   );

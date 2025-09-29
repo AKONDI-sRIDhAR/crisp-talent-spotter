@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import ResumeUpload from './ResumeUpload';
+import CandidateForm from './CandidateForm';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
@@ -13,13 +13,13 @@ type NewCandidateData = {
   email: string;
   phone: string;
   resumeText: string;
-  resumeDataUrl: string; // The correct, merged type definition
+  resumeDataUrl: string;
 };
 
 import { toast } from "sonner";
 
 const IntervieweePage: React.FC = () => {
-  const [step, setStep] = useState<'upload' | 'interview'>('upload');
+  const [step, setStep] = useState<'form' | 'interview'>('form');
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState(false);
   const [newCandidateData, setNewCandidateData] = useState<NewCandidateData | null>(null);
   const [existingCandidate, setExistingCandidate] = useState<Candidate | null>(null);
@@ -54,17 +54,6 @@ const IntervieweePage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (violationCount === 1) {
-      toast.warning("Warning: Leaving the test environment is not allowed.", {
-        description: "Your next violation will automatically terminate the interview.",
-        duration: 8000,
-      });
-    } else if (violationCount >= 2) {
-      terminateInterview();
-    }
-  }, [violationCount]);
-
-  useEffect(() => {
     // If there's a candidate in the store, we are in an active interview
     if (currentCandidate && currentCandidate.status !== 'completed') {
       setStep('interview');
@@ -72,43 +61,113 @@ const IntervieweePage: React.FC = () => {
   }, [currentCandidate]);
 
   useEffect(() => {
+    // Enhanced window violation detection for interview security
     if (step !== 'interview' || !currentCandidate || isDisqualified) {
       return;
     }
 
-    const violationProcessingRef = React.useRef(false);
+    let isProcessingViolation = false;
 
     const processViolation = () => {
-      if (violationProcessingRef.current) return;
-      violationProcessingRef.current = true;
-      setViolationCount(count => count + 1);
+      if (isProcessingViolation) return;
+      isProcessingViolation = true;
+      
+      setViolationCount(count => {
+        const newCount = count + 1;
+        if (newCount === 1) {
+          toast.warning("⚠️ Security Warning", {
+            description: "Leaving the interview environment is not allowed. Next violation will terminate the interview.",
+            duration: 6000,
+          });
+        } else if (newCount >= 2) {
+          // Immediate termination on second violation
+          setTimeout(() => terminateInterview(), 1000);
+        }
+        return newCount;
+      });
+      
       setTimeout(() => {
-        violationProcessingRef.current = false;
-      }, 500);
+        isProcessingViolation = false;
+      }, 1000);
     };
 
+    // Visibility change detection (switching tabs/windows)
     const handleVisibilityChange = () => {
       if (document.hidden) {
+        console.log('Interview violation: Tab/window hidden');
         processViolation();
       }
     };
 
+    // Focus change detection (clicking outside)
+    const handleWindowBlur = () => {
+      console.log('Interview violation: Window lost focus');
+      processViolation();
+    };
+
+    // Fullscreen exit detection
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement) {
+        console.log('Interview violation: Fullscreen exited');
         processViolation();
       }
     };
 
-    document.documentElement.requestFullscreen().catch(err => {
-      console.warn(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-    });
+    // Right-click prevention
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
+    };
 
+    // Key combination prevention (Alt+Tab, Ctrl+Tab, etc.)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent Alt+Tab, Ctrl+Tab, Windows key, F11, etc.
+      if (
+        (e.altKey && e.key === 'Tab') ||
+        (e.ctrlKey && e.key === 'Tab') ||
+        e.key === 'Meta' ||
+        e.key === 'F11' ||
+        (e.ctrlKey && e.shiftKey && e.key === 'I') || // Dev tools
+        (e.key === 'F12') // Dev tools
+      ) {
+        e.preventDefault();
+        processViolation();
+        return false;
+      }
+    };
+
+    // Request fullscreen mode
+    const enterFullscreen = async () => {
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch (err) {
+        console.warn('Fullscreen not supported or denied:', err);
+        toast.warning("Fullscreen Recommended", {
+          description: "For the best interview experience, please enable fullscreen mode.",
+          duration: 5000,
+        });
+      }
+    };
+
+    // Initialize security measures
+    enterFullscreen();
+
+    // Add all event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('keydown', handleKeyDown);
 
+    // Cleanup function
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+      
+      // Exit fullscreen when component unmounts
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => {});
       }
@@ -123,13 +182,13 @@ const IntervieweePage: React.FC = () => {
       email: data.email,
       phone: data.phone,
       resumeText: data.resumeText,
-      resumeDataUrl: data.resumeDataUrl, // Correctly assigns the data URL
+      resumeDataUrl: data.resumeDataUrl,
       score: 0,
       status: 'in-progress',
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
-      questions: [], // RESOLUTION: Initializing questions array as empty for dynamic generation
+      questions: [], // Dynamic AI-generated questions
     };
 
     // If there was an old in-progress interview, mark it as completed
@@ -142,7 +201,7 @@ const IntervieweePage: React.FC = () => {
     setStep('interview');
   };
 
-  const handleResumeComplete = (data: NewCandidateData) => {
+  const handleFormComplete = (data: NewCandidateData) => {
     // Check if a candidate with this email has an interview in progress
     const inProgressInterview = candidates.find(
       c => c.email.toLowerCase() === data.email.toLowerCase() && c.status === 'in-progress'
@@ -198,28 +257,17 @@ const IntervieweePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
-      {step === 'upload' && (
-        <div className="p-6">
-          {/* Header */}
-          <div className="max-w-2xl mx-auto mb-6">
-            <Button
-              variant="outline"
-              onClick={handleBackToLanding}
-              className="flex items-center gap-2 mb-6"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Home
-            </Button>
-          </div>
-
-          {/* Resume Upload */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+      {step === 'form' && (
+        <div className="relative">
+          <Button
+            variant="ghost"
+            onClick={handleBackToLanding}
+            className="absolute top-6 left-6 z-10 flex items-center gap-2 backdrop-blur-sm bg-card/50 hover:bg-card/80 border border-border/50"
           >
-            <ResumeUpload onComplete={handleResumeComplete} />
-          </motion.div>
+            <ArrowLeft className="w-4 h-4" />
+            Back to Home
+          </Button>
+          <CandidateForm onComplete={handleFormComplete} />
         </div>
       )}
 

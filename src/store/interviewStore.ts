@@ -116,8 +116,8 @@ export const useInterviewStore = create<InterviewStore>()(
       timeRemaining: 0,
       setTimeRemaining: (time) => set({ timeRemaining: time }),
 
-      // API Key Management
-      apiKey: null,
+      // API Key Management with default key
+      apiKey: 'AIzaSyCgbyLeYVkhGNLjCUQwv3SPLaZbMPYOxaY',
       setApiKey: (key) => set({ apiKey: key }),
 
       // Resume Data Management
