@@ -1,16 +1,91 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Users, Bot, Sparkles, Timer, ArrowRight, Zap } from 'lucide-react';
+import { Users, Bot, Sparkles, Timer, ArrowRight, Zap, Settings, X, CheckCircle2 } from 'lucide-react';
 import LiquidEther from './LiquidEther';
 import { useInterviewStore } from '@/store/interviewStore';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const LandingPage: React.FC = () => {
-  const { setCurrentMode, setCurrentCandidate } = useInterviewStore();
+  const { 
+    setCurrentMode, 
+    setCurrentCandidate, 
+    apiKey, 
+    setApiKey 
+  } = useInterviewStore();
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [localApiKey, setLocalApiKey] = useState(apiKey || '');
+  const [keySaved, setKeySaved] = useState(!!apiKey);
+
+  const handleSaveKey = () => {
+    setApiKey(localApiKey);
+    setKeySaved(!!localApiKey);
+    setShowSettings(false);
+  };
+
+  const handleClearKey = () => {
+    setApiKey(null);
+    setLocalApiKey('');
+    setKeySaved(false);
+  };
+
+  const renderSettingsModal = () => (
+    <Dialog open={showSettings} onOpenChange={setShowSettings}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="flex justify-between items-center">
+            <span>AI Service Settings</span>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" onClick={() => setShowSettings(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </DialogClose>
+          </DialogTitle>
+          <DialogDescription>
+            Enter your Google Gemini API Key. This key is stored securely in your browser's local storage.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="api-key">Gemini API Key</Label>
+            <Input
+              id="api-key"
+              type="password"
+              placeholder="Enter your AI API Key (AIzaSy...)"
+              value={localApiKey}
+              onChange={(e) => setLocalApiKey(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-between gap-2">
+            <Button onClick={handleSaveKey} disabled={!localApiKey} className="flex-1">
+              {keySaved ? "Update Key" : "Save Key"}
+            </Button>
+            <Button onClick={handleClearKey} variant="secondary" disabled={!keySaved}>
+              Clear Key
+            </Button>
+          </div>
+        </div>
+        
+        {keySaved && (
+          <Alert>
+            <CheckCircle2 className="w-4 h-4" />
+            <AlertDescription>API Key successfully saved for this session.</AlertDescription>
+          </Alert>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background via-background to-muted/10">
+      {renderSettingsModal()}
+
       {/* LiquidEther Background */}
       <div className="absolute inset-0 opacity-30">
         <LiquidEther
@@ -40,6 +115,18 @@ const LandingPage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
         >
+          {/* Settings Button */}
+          <div className="absolute top-4 right-4">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => setShowSettings(true)}
+              className={keySaved ? "border-green-500 hover:bg-green-500/10" : "border-destructive/50 hover:bg-destructive/10"}
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
+          </div>
+
           {/* Header */}
           <div className="space-y-6">
             <motion.div
@@ -122,7 +209,6 @@ const LandingPage: React.FC = () => {
                     onClick={() => {
                       setCurrentMode('interviewee');
                       setCurrentCandidate(null);
-                      useInterviewStore.getState().setInterviewStep('form');
                     }}
                     className="w-full mt-6 h-12 text-lg font-medium bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 shadow-lg group-hover:shadow-2xl"
                     size="lg"
