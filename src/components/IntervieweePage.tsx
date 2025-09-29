@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import CandidateForm from './CandidateForm';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
+import PreInterviewCheck from './PreInterviewCheck';
 import { useInterviewStore, Candidate } from '@/store/interviewStore';
 // NOTE: import { questionSets } from '@/lib/preGeneratedQuestions'; is removed, as questions are generated dynamically.
 
@@ -20,7 +21,6 @@ type NewCandidateData = {
 import { toast } from "sonner";
 
 const IntervieweePage: React.FC = () => {
-  const { interviewStep, setInterviewStep } = useInterviewStore();
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState(false);
   const [newCandidateData, setNewCandidateData] = useState<NewCandidateData | null>(null);
   const [existingCandidate, setExistingCandidate] = useState<Candidate | null>(null);
@@ -28,6 +28,8 @@ const IntervieweePage: React.FC = () => {
   const [isDisqualified, setIsDisqualified] = useState(false);
 
   const { 
+    interviewStep, 
+    setInterviewStep,
     currentCandidate,
     setCurrentCandidate,
     candidates,
@@ -56,6 +58,7 @@ const IntervieweePage: React.FC = () => {
 
   useEffect(() => {
     // Enhanced window violation detection for interview security
+    // NOTE: document.fullscreenElement checks (fullscreen mode) have been removed for a lighter-touch security model.
     if (interviewStep !== 'interview' || !currentCandidate || isDisqualified) {
       return;
     }
@@ -99,77 +102,41 @@ const IntervieweePage: React.FC = () => {
       processViolation();
     };
 
-    // Fullscreen exit detection
-    const handleFullscreenChange = () => {
-      if (!document.fullscreenElement) {
-        console.log('Interview violation: Fullscreen exited');
-        processViolation();
-      }
-    };
-
-    // Right-click prevention
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      return false;
-    };
-
-    // Key combination prevention (Alt+Tab, Ctrl+Tab, etc.)
+    // Simplified Key combination prevention (Dev tools)
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent Alt+Tab, Ctrl+Tab, Windows key, F11, etc.
       if (
-        (e.altKey && e.key === 'Tab') ||
-        (e.ctrlKey && e.key === 'Tab') ||
-        e.key === 'Meta' ||
-        e.key === 'F11' ||
-        (e.ctrlKey && e.shiftKey && e.key === 'I') || // Dev tools
-        (e.key === 'F12') // Dev tools
+        (e.ctrlKey && e.shiftKey && e.key === 'I') || // Dev tools (Chrome/Edge)
+        e.key === 'F12' || // Dev tools
+        (e.key === 'F11') // Fullscreen Toggle Prevention
       ) {
         e.preventDefault();
         processViolation();
         return false;
       }
     };
-
-    // Request fullscreen mode
-    const enterFullscreen = async () => {
-      try {
-        await document.documentElement.requestFullscreen();
-      } catch (err) {
-        console.warn('Fullscreen not supported or denied:', err);
-        toast.warning("Fullscreen Recommended", {
-          description: "For the best interview experience, please enable fullscreen mode.",
-          duration: 5000,
-        });
-      }
+    
+    // Right-click prevention
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
     };
 
-    // Initialize security measures
-    enterFullscreen();
-
-    // Add all event listeners
+    // Add simplified event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('contextmenu', handleContextMenu);
 
     // Cleanup function
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('keydown', handleKeyDown);
-      
-      // Exit fullscreen when component unmounts
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(() => {});
-      }
+      document.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, [step, currentCandidate, isDisqualified, terminateInterview]);
+  }, [interviewStep, currentCandidate, isDisqualified, terminateInterview]);
 
-  const startNewInterview = (data: NewCandidateData) => {
-    // Create a new candidate
+  const startNewInterviewFlow = (data: NewCandidateData) => {
     const newCandidate: Candidate = {
       id: `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: data.name,
@@ -177,26 +144,28 @@ const IntervieweePage: React.FC = () => {
       phone: data.phone,
       resumeText: data.resumeText,
       resumeDataUrl: data.resumeDataUrl,
+      resumeSummary: data.resumeSummary, // Ensure summary is passed
       score: 0,
       status: 'in-progress',
       startTime: new Date(),
       answers: [],
       currentQuestionIndex: 0,
-      questions: [], // Dynamic AI-generated questions
+      questions: [],
     };
 
-    // If there was an old in-progress interview, mark it as completed
+    // Mark old interview as completed if starting a fresh one
     if (existingCandidate) {
       updateCandidate(existingCandidate.id, { status: 'completed', endTime: new Date() });
     }
 
     addCandidate(newCandidate);
     setCurrentCandidate(newCandidate);
-    setInterviewStep('interview');
+    
+    // Transition to the pre-check step for data verification
+    setInterviewStep('pre-interview-check');
   };
 
   const handleFormComplete = (data: NewCandidateData) => {
-    // Check if a candidate with this email has an interview in progress
     const inProgressInterview = candidates.find(
       c => c.email.toLowerCase() === data.email.toLowerCase() && c.status === 'in-progress'
     );
@@ -206,7 +175,8 @@ const IntervieweePage: React.FC = () => {
       setNewCandidateData(data);
       setShowWelcomeBackModal(true);
     } else {
-      startNewInterview(data);
+      // Start the flow with the extracted/manual data
+      startNewInterviewFlow(data);
     }
   };
 
@@ -220,7 +190,8 @@ const IntervieweePage: React.FC = () => {
 
   const handleStartNewInterview = () => {
     if (newCandidateData) {
-      startNewInterview(newCandidateData);
+      // This will call startNewInterviewFlow, which correctly transitions to 'pre-interview-check'
+      startNewInterviewFlow(newCandidateData); 
       setShowWelcomeBackModal(false);
     }
   };
@@ -264,6 +235,8 @@ const IntervieweePage: React.FC = () => {
           <CandidateForm onComplete={handleFormComplete} />
         </div>
       )}
+
+      {interviewStep === 'pre-interview-check' && <PreInterviewCheck />}
 
       {interviewStep === 'interview' && <InterviewChat />}
 
