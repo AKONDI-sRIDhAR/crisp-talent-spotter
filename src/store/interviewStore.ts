@@ -52,6 +52,7 @@ interface InterviewStore {
   updateCandidate: (id: string, updates: Partial<Candidate>) => void;
 
   // Interview state
+  // FIX: Includes the 'pre-interview-check' step for data gathering
   interviewStep: 'form' | 'pre-interview-check' | 'interview';
   setInterviewStep: (step: 'form' | 'pre-interview-check' | 'interview') => void;
   currentQuestion: InterviewQuestion | null;
@@ -68,9 +69,8 @@ interface InterviewStore {
   nextQuestion: () => void;
   finishInterview: (finalCandidate: Candidate) => void;
 
-  // API Key Management (Added for security/functionality)
-  apiKey: string | null;
-  setApiKey: (key: string | null) => void;
+  // API Key Management (Hardcoded as requested)
+  apiKey: string;
 
   // Resume data extraction
   extractedData: {
@@ -95,6 +95,7 @@ export const useInterviewStore = create<InterviewStore>()(
       currentCandidate: null,
       setCurrentCandidate: (candidate) => set({ currentCandidate: candidate }),
 
+      // FIX: Set initial step and setter to the new combined type
       interviewStep: 'form',
       setInterviewStep: (step) => set({ interviewStep: step }),
 
@@ -120,9 +121,8 @@ export const useInterviewStore = create<InterviewStore>()(
       timeRemaining: 0,
       setTimeRemaining: (time) => set({ timeRemaining: time }),
 
-      // API Key Management with default key
+      // API Key Management - Hardcoded default as requested
       apiKey: 'AIzaSyCgbyLeYVkhGNLjCUQwv3SPLaZbMPYOxaY',
-      setApiKey: (key) => set({ apiKey: key }),
 
       // Resume Data Management
       extractedData: {},
@@ -184,6 +184,7 @@ export const useInterviewStore = create<InterviewStore>()(
           currentCandidate: null,
           currentQuestion: null,
           currentMode: 'landing',
+          interviewStep: 'form', // Reset to form for the next session
         }));
       },
 
@@ -200,6 +201,7 @@ export const useInterviewStore = create<InterviewStore>()(
         extractedData: state.extractedData, // Ensure extracted data is persisted
         apiKey: state.apiKey, // Ensure API key is persisted
         questionSetIndex: state.questionSetIndex,
+        interviewStep: state.interviewStep, // Persist the interview step
       }),
     }
   )
