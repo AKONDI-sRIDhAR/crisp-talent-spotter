@@ -15,7 +15,8 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // FIX: Exclude the entire package to resolve internal pathing issues
   optimizeDeps: {
-    exclude: ['pdfjs-dist/build/pdf.worker.mjs'],
+    exclude: ['pdfjs-dist'], 
   },
 }));
