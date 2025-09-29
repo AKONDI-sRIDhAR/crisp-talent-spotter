@@ -21,17 +21,6 @@ type NewCandidateData = {
 import { toast } from "sonner";
 
 const IntervieweePage: React.FC = () => {
-  const {
-    interviewStep,
-    setInterviewStep,
-    currentCandidate,
-    setCurrentCandidate,
-    candidates,
-    addCandidate,
-    updateCandidate,
-    setCurrentMode,
-    finishInterview,
-  } = useInterviewStore();
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState(false);
   const [newCandidateData, setNewCandidateData] = useState<NewCandidateData | null>(null);
   const [existingCandidate, setExistingCandidate] = useState<Candidate | null>(null);
@@ -39,6 +28,8 @@ const IntervieweePage: React.FC = () => {
   const [isDisqualified, setIsDisqualified] = useState(false);
 
   const { 
+    interviewStep, 
+    setInterviewStep,
     currentCandidate,
     setCurrentCandidate,
     candidates,
@@ -67,6 +58,7 @@ const IntervieweePage: React.FC = () => {
 
   useEffect(() => {
     // Enhanced window violation detection for interview security
+    // NOTE: document.fullscreenElement checks (fullscreen mode) have been removed for a lighter-touch security model.
     if (interviewStep !== 'interview' || !currentCandidate || isDisqualified) {
       return;
     }
@@ -110,30 +102,39 @@ const IntervieweePage: React.FC = () => {
       processViolation();
     };
 
-    // Simplified Key combination prevention
+    // Simplified Key combination prevention (Dev tools)
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
-        (e.ctrlKey && e.shiftKey && e.key === 'I') || // Dev tools
-        e.key === 'F12' // Dev tools
+        (e.ctrlKey && e.shiftKey && e.key === 'I') || // Dev tools (Chrome/Edge)
+        e.key === 'F12' || // Dev tools
+        (e.key === 'F11') // Fullscreen Toggle Prevention
       ) {
         e.preventDefault();
         processViolation();
         return false;
       }
     };
+    
+    // Right-click prevention
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
+    };
 
     // Add simplified event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
     document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('contextmenu', handleContextMenu);
 
     // Cleanup function
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, [step, currentCandidate, isDisqualified, terminateInterview]);
+  }, [interviewStep, currentCandidate, isDisqualified, terminateInterview]);
 
   const startNewInterviewFlow = (data: NewCandidateData) => {
     const newCandidate: Candidate = {
@@ -143,6 +144,7 @@ const IntervieweePage: React.FC = () => {
       phone: data.phone,
       resumeText: data.resumeText,
       resumeDataUrl: data.resumeDataUrl,
+      resumeSummary: data.resumeSummary, // Ensure summary is passed
       score: 0,
       status: 'in-progress',
       startTime: new Date(),
@@ -151,12 +153,15 @@ const IntervieweePage: React.FC = () => {
       questions: [],
     };
 
+    // Mark old interview as completed if starting a fresh one
     if (existingCandidate) {
       updateCandidate(existingCandidate.id, { status: 'completed', endTime: new Date() });
     }
 
     addCandidate(newCandidate);
     setCurrentCandidate(newCandidate);
+    
+    // Transition to the pre-check step for data verification
     setInterviewStep('pre-interview-check');
   };
 
@@ -170,6 +175,7 @@ const IntervieweePage: React.FC = () => {
       setNewCandidateData(data);
       setShowWelcomeBackModal(true);
     } else {
+      // Start the flow with the extracted/manual data
       startNewInterviewFlow(data);
     }
   };
@@ -184,7 +190,8 @@ const IntervieweePage: React.FC = () => {
 
   const handleStartNewInterview = () => {
     if (newCandidateData) {
-      startNewInterviewFlow(newCandidateData);
+      // This will call startNewInterviewFlow, which correctly transitions to 'pre-interview-check'
+      startNewInterviewFlow(newCandidateData); 
       setShowWelcomeBackModal(false);
     }
   };

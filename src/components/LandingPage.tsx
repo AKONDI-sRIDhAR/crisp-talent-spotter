@@ -5,13 +5,27 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Users, Bot, Sparkles, Timer, ArrowRight, Zap } from 'lucide-react';
 import LiquidEther from './LiquidEther';
 import { useInterviewStore } from '@/store/interviewStore';
+// FIX: Removed unnecessary imports related to the removed settings modal:
+// import { Settings, X, CheckCircle2 } from 'lucide-react';
+// import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+// import { Input } from '@/components/ui/input';
+// import { Label } from '@/components/ui/label';
+// import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const LandingPage: React.FC = () => {
-  const { setCurrentMode, setCurrentCandidate } = useInterviewStore();
+  // Merged the destructuring and removed all API key state management as requested.
+  const { 
+    setCurrentMode, 
+    setCurrentCandidate 
+  } = useInterviewStore();
+
+  // Removed all state and functions related to API key settings (showSettings, handleSaveKey, renderSettingsModal, etc.).
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background via-background to-muted/10">
-      {/* LiquidEther Background */}
+      {/* The renderSettingsModal call is removed */}
+
+      {/* LiquidEther Background - This block remains as it defines the visual background. */}
       <div className="absolute inset-0 opacity-30">
         <LiquidEther
           colors={['#5227FF', '#FF9FFC', '#B19EEF']}
@@ -40,6 +54,8 @@ const LandingPage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
         >
+          {/* Settings Button UI removed entirely */}
+
           {/* Header */}
           <div className="space-y-6">
             <motion.div
