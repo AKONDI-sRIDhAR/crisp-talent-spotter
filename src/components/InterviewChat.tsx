@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, User, Trophy, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -57,14 +57,13 @@ const InterviewChat: React.FC = () => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [timerActive, timeRemaining]);
+  }, [timerActive, timeRemaining, setTimeRemaining, handleTimeUp]);
 
-  const generateNextQuestion = async () => {
+  const generateNextQuestion = useCallback(async () => {
     const latestCandidate = useInterviewStore.getState().currentCandidate;
     if (!latestCandidate || !apiKey) return;
 
     const questionIndex = latestCandidate.currentQuestionIndex;
-
     if (questionIndex >= 6) {
       await finishInterviewProcess();
       return;
@@ -94,7 +93,6 @@ const InterviewChat: React.FC = () => {
       setTimerActive(true);
     } catch (error) {
       console.error('Error generating question:', error);
-      
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
         type: 'ai',
@@ -105,7 +103,7 @@ const InterviewChat: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [apiKey, finishInterviewProcess, setCurrentQuestion, setTimeRemaining, setTimerActive]);
 
   useEffect(() => {
     if (!currentCandidate) return;
@@ -118,20 +116,19 @@ const InterviewChat: React.FC = () => {
         timestamp: new Date(),
       };
       setMessages([welcomeMessage]);
+      return;
     }
 
-    if (currentCandidate.currentQuestionIndex >= 0 && messages.length > 0) {
+    const questionAlreadyExists = messages.some(
+      (m) => m.id === `question-${currentCandidate.currentQuestionIndex}`
+    );
+
+    if (!questionAlreadyExists && !isLoading) {
       generateNextQuestion();
     }
-  }, [currentCandidate?.currentQuestionIndex]);
+  }, [currentCandidate, messages, isLoading, generateNextQuestion]);
 
-  useEffect(() => {
-    if (currentCandidate && messages.length === 1 && messages[0].id === 'welcome') {
-      generateNextQuestion();
-    }
-  }, [messages.length]);
-
-  const handleSubmitAnswer = async () => {
+  const handleSubmitAnswer = useCallback(async () => {
     if (!selectedOption || !currentQuestion || !currentCandidate) return;
 
     const timeUsed = currentQuestion.timeLimit - timeRemaining;
@@ -155,14 +152,14 @@ const InterviewChat: React.FC = () => {
     
     nextQuestion();
     setIsLoading(false);
-  };
+  }, [selectedOption, currentQuestion, currentCandidate, timeRemaining, setTimerActive, submitAnswer, finishInterviewProcess, nextQuestion]);
 
-  const handleTimeUp = () => {
+  const handleTimeUp = useCallback(() => {
     setSelectedOption(prev => prev || 'No answer selected due to time limit.');
     handleSubmitAnswer();
-  };
+  }, [handleSubmitAnswer]);
 
-  const finishInterviewProcess = async () => {
+  const finishInterviewProcess = useCallback(async () => {
     const latestCandidate = useInterviewStore.getState().currentCandidate;
     if (!latestCandidate) return;
 
@@ -176,9 +173,7 @@ const InterviewChat: React.FC = () => {
         let score = 0;
         let comment = 'No answer was provided before the time ran out.';
 
-        // Conditional scoring logic (Avoids API call for known time-out answers)
         if (answer.answer !== 'No answer selected due to time limit.') {
-          // Pass apiKey to the service call
           const aiResult = await aiService.scoreAnswer(
             answer.question,
             answer.answer,
@@ -190,12 +185,7 @@ const InterviewChat: React.FC = () => {
         }
         
         const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
-
-        const scoredAnswer = {
-          ...answer,
-          aiScore: score, // Keep original 0-10 score for AI feedback
-          aiComment: comment,
-        };
+        const scoredAnswer = { ...answer, aiScore: score, aiComment: comment };
         
         scoredAnswers.push(scoredAnswer);
         finalTotalScore += weightedScore;
@@ -222,11 +212,9 @@ const InterviewChat: React.FC = () => {
         : `🎉 **Interview Complete!**\n\nThank you for taking the interview, ${latestCandidate.name}! Your responses have been saved.`;
 
       setMessages(prev => [...prev, { id: 'final', type: 'ai', content: finalMessageContent, timestamp: new Date() }]);
-      
       setTimeout(() => finishInterview(finalCandidate), 5000);
     } catch (error) {
       console.error('Error finishing interview:', error);
-      // Using the more detailed error object for state persistence
       const candidateOnError = {
         ...latestCandidate,
         status: 'completed' as const,
@@ -235,11 +223,10 @@ const InterviewChat: React.FC = () => {
         score: 0,
       };
       finishInterview(candidateOnError); 
-      
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [apiKey, finishInterview]);
 
   if (!currentCandidate) return null;
 

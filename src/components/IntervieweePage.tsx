@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
@@ -14,6 +14,7 @@ type NewCandidateData = {
   phone: string;
   resumeText: string;
   resumeDataUrl: string;
+  resumeSummary: string | null;
 };
 
 import { toast } from "sonner";
@@ -38,7 +39,7 @@ const IntervieweePage: React.FC = () => {
     incrementQuestionSetIndex, // Kept for minimal change, though unused
   } = useInterviewStore();
 
-  const terminateInterview = () => {
+  const terminateInterview = useCallback(() => {
     if (!currentCandidate) return;
 
     const finalCandidate = {
@@ -51,7 +52,7 @@ const IntervieweePage: React.FC = () => {
 
     finishInterview(finalCandidate);
     setIsDisqualified(true);
-  };
+  }, [currentCandidate, finishInterview]);
 
   useEffect(() => {
     // If there's a candidate in the store, we are in an active interview
@@ -172,7 +173,7 @@ const IntervieweePage: React.FC = () => {
         document.exitFullscreen().catch(() => {});
       }
     };
-  }, [step, currentCandidate, isDisqualified]);
+  }, [step, currentCandidate, isDisqualified, terminateInterview]);
 
   const startNewInterview = (data: NewCandidateData) => {
     // Create a new candidate

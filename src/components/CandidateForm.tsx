@@ -52,12 +52,8 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
       handleInputChange('phone', phoneMatch[0].replace(/\D/g, ''));
     }
 
-    // Attempt to find a name - this is less reliable
-    const nameRegex = /([A-Z][a-z]+)\s+([A-Z][a-z]+)/;
-    const nameMatch = text.match(nameRegex);
-    if (nameMatch) {
-      handleInputChange('name', nameMatch[0]);
-    }
+    // NOTE: Name extraction has been removed as per user feedback due to unreliability.
+    // The user is now required to enter their name manually to ensure accuracy.
   };
 
   // Helper function to read file as Data URL
@@ -124,9 +120,21 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
       return;
     }
 
-    // Call onComplete with null for resumeSummary since extraction is removed
+    // Format the phone number to the Indian standard (+91) before submission.
+    let phone = formData.phone.replace(/\D/g, ''); // Remove all non-digit characters.
+
+    if (phone.length > 10) {
+      // If the number includes a country code (e.g., 919876543210) or leading zero,
+      // take the last 10 digits to ensure a consistent format.
+      phone = phone.slice(-10);
+    }
+
+    const formattedPhone = `+91${phone}`;
+
+    // Call onComplete with the formatted phone number and other data.
     onComplete({
       ...formData,
+      phone: formattedPhone,
       resumeText,
       resumeDataUrl,
       resumeSummary: null, // Always pass null now
@@ -222,7 +230,7 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9+\-\s\(\)]/g, '');
+                    const value = e.target.value.replace(/[^0-9+\-()\s]/g, '');
                     handleInputChange('phone', value);
                   }}
                   placeholder="e.g., (123) 456-7890"
