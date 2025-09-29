@@ -56,9 +56,17 @@ const IntervieweePage: React.FC = () => {
     setIsDisqualified(true);
   }, [currentCandidate, finishInterview]);
 
+  const enterFullscreen = async () => {
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch (err) {
+      console.warn('Fullscreen not supported or denied:', err);
+      // No toast on denial for smoother UX, rely on other violation checks
+    }
+  };
+
   useEffect(() => {
     // Enhanced window violation detection for interview security
-    // NOTE: document.fullscreenElement checks (fullscreen mode) have been removed for a lighter-touch security model.
     if (interviewStep !== 'interview' || !currentCandidate || isDisqualified) {
       return;
     }
@@ -102,7 +110,16 @@ const IntervieweePage: React.FC = () => {
       processViolation();
     };
 
-    // Simplified Key combination prevention (Dev tools)
+    // Fullscreen exit detection
+    const handleFullscreenChange = () => {
+      // Check if not in fullscreen AND we are actively in the interview step
+      if (!document.fullscreenElement) {
+        console.log('Interview violation: Fullscreen exited');
+        processViolation();
+      }
+    };
+
+    // Key combination prevention (Dev tools)
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
         (e.ctrlKey && e.shiftKey && e.key === 'I') || // Dev tools (Chrome/Edge)
@@ -121,18 +138,28 @@ const IntervieweePage: React.FC = () => {
       return false;
     };
 
-    // Add simplified event listeners
+    // Initialize security measures
+    // Only attempt fullscreen if we are in the 'interview' step
+    if (interviewStep === 'interview') {
+      enterFullscreen();
+    }
+
+    // Add all event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('fullscreenchange', handleFullscreenChange); // Added fullscreen listener
     document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('keydown', handleKeyDown);
 
     // Cleanup function
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+      
+      // Removed document.exitFullscreen() on unmount for cleaner UX
     };
   }, [interviewStep, currentCandidate, isDisqualified, terminateInterview]);
 
@@ -161,7 +188,7 @@ const IntervieweePage: React.FC = () => {
     addCandidate(newCandidate);
     setCurrentCandidate(newCandidate);
     
-    // Transition to the pre-check step for data verification
+    // FIX: Transition to the pre-check step for data verification
     setInterviewStep('pre-interview-check');
   };
 
@@ -236,8 +263,10 @@ const IntervieweePage: React.FC = () => {
         </div>
       )}
 
+      {/* Renders the conversational flow for checking missing fields */}
       {interviewStep === 'pre-interview-check' && <PreInterviewCheck />}
 
+      {/* Renders the main chat interview interface */}
       {interviewStep === 'interview' && <InterviewChat />}
 
       {showWelcomeBackModal && (

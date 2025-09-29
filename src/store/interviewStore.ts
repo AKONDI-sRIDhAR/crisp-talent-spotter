@@ -52,7 +52,7 @@ interface InterviewStore {
   updateCandidate: (id: string, updates: Partial<Candidate>) => void;
 
   // Interview state
-  // FIX: Merged to include 'pre-interview-check' step
+  // FIX: Includes the 'pre-interview-check' step for data gathering
   interviewStep: 'form' | 'pre-interview-check' | 'interview';
   setInterviewStep: (step: 'form' | 'pre-interview-check' | 'interview') => void;
   currentQuestion: InterviewQuestion | null;
