@@ -52,6 +52,8 @@ interface InterviewStore {
   updateCandidate: (id: string, updates: Partial<Candidate>) => void;
 
   // Interview state
+  interviewStep: 'form' | 'interview';
+  setInterviewStep: (step: 'form' | 'interview') => void;
   currentQuestion: InterviewQuestion | null;
   setCurrentQuestion: (question: InterviewQuestion | null) => void;
   
@@ -92,6 +94,9 @@ export const useInterviewStore = create<InterviewStore>()(
 
       currentCandidate: null,
       setCurrentCandidate: (candidate) => set({ currentCandidate: candidate }),
+
+      interviewStep: 'form',
+      setInterviewStep: (step) => set({ interviewStep: step }),
 
       candidates: [],
       addCandidate: (candidate) => set((state) => ({ 
@@ -179,6 +184,7 @@ export const useInterviewStore = create<InterviewStore>()(
           currentCandidate: null,
           currentQuestion: null,
           currentMode: 'landing',
+          interviewStep: 'form', // Reset to form for the next session
         }));
       },
 
