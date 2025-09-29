@@ -9,6 +9,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useInterviewStore } from '@/store/interviewStore';
 import { aiService } from '@/services/aiService';
 import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
+
 // Setup the worker source for pdfjs
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.mjs',
@@ -67,24 +69,29 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
     setIsParsing(true);
     setFileName(file.name);
 
-    if (file.type.includes('docx')) {
-      setError('DOCX files are not supported yet. Please upload a PDF.');
-      setIsParsing(false);
-      return;
-    }
-
     try {
       const dataUrl = await readFileAsDataURL(file);
       setResumeDataUrl(dataUrl);
 
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
       let textContent = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const text = await page.getTextContent();
-        textContent += text.items.map(item => ('str' in item ? item.str : '')).join(' ');
+
+      if (file.type === 'application/pdf') {
+        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const text = await page.getTextContent();
+          textContent += text.items.map(item => ('str' in item ? item.str : '')).join(' ');
+        }
+      } else if (file.name.endsWith('.docx')) {
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        textContent = result.value;
+      } else {
+        setError('Unsupported file type. Please upload a PDF or DOCX file.');
+        setIsParsing(false);
+        return;
       }
+
       setResumeText(textContent);
 
       // Extract data using AI service
@@ -100,7 +107,7 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
 
     } catch (err) {
       console.error('Error handling file:', err);
-      setError('Failed to parse the PDF file. Please check the console for details.');
+      setError('Failed to parse the resume file. Please check the console for details.');
     } finally {
       setIsParsing(false);
     }
