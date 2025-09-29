@@ -5,27 +5,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Users, Bot, Sparkles, Timer, ArrowRight, Zap } from 'lucide-react';
 import LiquidEther from './LiquidEther';
 import { useInterviewStore } from '@/store/interviewStore';
-// FIX: Removed unnecessary imports related to the removed settings modal:
-// import { Settings, X, CheckCircle2 } from 'lucide-react';
-// import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
-// import { Input } from '@/components/ui/input';
-// import { Label } from '@/components/ui/label';
-// import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const LandingPage: React.FC = () => {
-  // Merged the destructuring and removed all API key state management as requested.
   const { 
     setCurrentMode, 
-    setCurrentCandidate 
+    setCurrentCandidate,
+    setInterviewStep
   } = useInterviewStore();
-
-  // Removed all state and functions related to API key settings (showSettings, handleSaveKey, renderSettingsModal, etc.).
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background via-background to-muted/10">
-      {/* The renderSettingsModal call is removed */}
-
-      {/* LiquidEther Background - This block remains as it defines the visual background. */}
       <div className="absolute inset-0 opacity-30">
         <LiquidEther
           colors={['#5227FF', '#FF9FFC', '#B19EEF']}
@@ -46,7 +35,6 @@ const LandingPage: React.FC = () => {
         />
       </div>
 
-      {/* Content Overlay */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-6">
         <motion.div 
           className="text-center space-y-12 max-w-5xl mx-auto"
@@ -54,9 +42,6 @@ const LandingPage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
         >
-          {/* Settings Button UI removed entirely */}
-
-          {/* Header */}
           <div className="space-y-6">
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
@@ -95,14 +80,12 @@ const LandingPage: React.FC = () => {
             </motion.div>
           </div>
 
-          {/* Mode Selection Cards */}
           <motion.div 
             className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto"
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.6 }}
           >
-            {/* Interviewee Card */}
             <motion.div
               whileHover={{ y: -8, scale: 1.02 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
@@ -138,6 +121,7 @@ const LandingPage: React.FC = () => {
                     onClick={() => {
                       setCurrentMode('interviewee');
                       setCurrentCandidate(null);
+                      setInterviewStep('form'); // Reset the flow to the beginning
                     }}
                     className="w-full mt-6 h-12 text-lg font-medium bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 shadow-lg group-hover:shadow-2xl"
                     size="lg"
@@ -149,7 +133,6 @@ const LandingPage: React.FC = () => {
               </Card>
             </motion.div>
 
-            {/* Interviewer Card */}
             <motion.div
               whileHover={{ y: -8, scale: 1.02 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
@@ -195,7 +178,6 @@ const LandingPage: React.FC = () => {
             </motion.div>
           </motion.div>
 
-          {/* Features Footer */}
           <motion.div 
             className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground/70 pt-8"
             initial={{ opacity: 0 }}
@@ -210,7 +192,7 @@ const LandingPage: React.FC = () => {
               <Timer className="w-4 h-4 text-primary" />
               <span>Instant Scoring</span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/20 backdrop-blur-sm">
+            <div className="flex items-center gap-2 px-4 py-2 rounded--full bg-muted/20 backdrop-blur-sm">
               <Users className="w-4 h-4 text-primary" />
               <span>Detailed Analytics</span>
             </div>
