@@ -20,7 +20,7 @@ type NewCandidateData = {
 import { toast } from "sonner";
 
 const IntervieweePage: React.FC = () => {
-  const [step, setStep] = useState<'form' | 'interview'>('form');
+  const { interviewStep, setInterviewStep } = useInterviewStore();
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState(false);
   const [newCandidateData, setNewCandidateData] = useState<NewCandidateData | null>(null);
   const [existingCandidate, setExistingCandidate] = useState<Candidate | null>(null);
@@ -55,15 +55,8 @@ const IntervieweePage: React.FC = () => {
   }, [currentCandidate, finishInterview]);
 
   useEffect(() => {
-    // If there's a candidate in the store, we are in an active interview
-    if (currentCandidate && currentCandidate.status !== 'completed') {
-      setStep('interview');
-    }
-  }, [currentCandidate]);
-
-  useEffect(() => {
     // Enhanced window violation detection for interview security
-    if (step !== 'interview' || !currentCandidate || isDisqualified) {
+    if (interviewStep !== 'interview' || !currentCandidate || isDisqualified) {
       return;
     }
 
@@ -199,7 +192,7 @@ const IntervieweePage: React.FC = () => {
 
     addCandidate(newCandidate);
     setCurrentCandidate(newCandidate);
-    setStep('interview');
+    setInterviewStep('interview');
   };
 
   const handleFormComplete = (data: NewCandidateData) => {
@@ -220,7 +213,7 @@ const IntervieweePage: React.FC = () => {
   const handleResumeOldInterview = () => {
     if (existingCandidate) {
       setCurrentCandidate(existingCandidate);
-      setStep('interview');
+      setInterviewStep('interview');
       setShowWelcomeBackModal(false);
     }
   };
@@ -258,7 +251,7 @@ const IntervieweePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
-      {step === 'form' && (
+      {interviewStep === 'form' && (
         <div className="relative">
           <Button
             variant="ghost"
@@ -272,7 +265,7 @@ const IntervieweePage: React.FC = () => {
         </div>
       )}
 
-      {step === 'interview' && <InterviewChat />}
+      {interviewStep === 'interview' && <InterviewChat />}
 
       {showWelcomeBackModal && (
         <WelcomeBackModal

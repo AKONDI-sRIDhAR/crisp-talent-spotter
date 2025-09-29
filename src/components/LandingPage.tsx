@@ -7,7 +7,7 @@ import LiquidEther from './LiquidEther';
 import { useInterviewStore } from '@/store/interviewStore';
 
 const LandingPage: React.FC = () => {
-  const { setCurrentMode } = useInterviewStore();
+  const { setCurrentMode, setCurrentCandidate } = useInterviewStore();
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background via-background to-muted/10">
@@ -119,7 +119,11 @@ const LandingPage: React.FC = () => {
                   </div>
                   
                   <Button 
-                    onClick={() => setCurrentMode('interviewee')}
+                    onClick={() => {
+                      setCurrentMode('interviewee');
+                      setCurrentCandidate(null);
+                      useInterviewStore.getState().setInterviewStep('form');
+                    }}
                     className="w-full mt-6 h-12 text-lg font-medium bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 shadow-lg group-hover:shadow-2xl"
                     size="lg"
                   >
