@@ -22,7 +22,6 @@ const InterviewChat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedOption, setSelectedOption] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKeyMissing, setApiKeyMissing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout>();
 
@@ -52,18 +51,6 @@ const InterviewChat: React.FC = () => {
     const latestCandidate = useInterviewStore.getState().currentCandidate;
     if (!latestCandidate) return;
 
-    // API Key Check (Critical functionality)
-    if (!apiKey) {
-      const errorMessage: Message = {
-        id: `error-no-api-key`,
-        type: 'ai',
-        content: 'The API key is missing. Please set it on the homepage to begin the interview.',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-      setIsLoading(false);
-      return;
-    }
 
     const questionIndex = latestCandidate.currentQuestionIndex;
     if (questionIndex >= 6) {
@@ -153,13 +140,6 @@ const InterviewChat: React.FC = () => {
 
   useEffect(() => {
     if (!currentCandidate) return;
-
-    // Check if the API key is locally missing (from store)
-    if (!apiKey) {
-      setApiKeyMissing(true);
-      return;
-    }
-    setApiKeyMissing(false);
 
     if (messages.length === 0) {
       const welcomeMessage: Message = {
@@ -257,53 +237,6 @@ const InterviewChat: React.FC = () => {
 
   const progress = (currentCandidate.currentQuestionIndex / 6) * 100;
 
-  // Setup Guide component is only rendered if apiKey is missing
-  const ApiKeySetupGuide: React.FC = () => (
-    <div className="flex justify-center p-4">
-      <Card className="max-w-2xl bg-orange-100 dark:bg-orange-900/30 border-orange-500">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-orange-700 dark:text-orange-300">
-            <AlertTriangle className="w-6 h-6" />
-            Action Required: Set Up Your API Key
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6 pt-0">
-          <p className="text-sm text-muted-foreground mb-4">
-            To enable the AI-powered features of this application, you need to provide a Google AI API key.
-          </p>
-          <div className="space-y-3 text-sm bg-background/50 p-4 rounded-lg border">
-            <p>
-              <strong>Step 1:</strong> Create a new file named <code>.env.local</code> in the main project folder (the same folder that contains <code>package.json</code>).
-            </p>
-            <p>
-              <strong>Step 2:</strong> Open the <code>.env.local</code> file and add the following line, replacing <code>YOUR_API_KEY_HERE</code> with your actual Google AI API key:
-            </p>
-            <pre className="p-2 bg-muted rounded-md text-xs overflow-x-auto">
-              <code>VITE_GEMINI_API_KEY=YOUR_API_KEY_HERE</code>
-            </pre>
-            <p>
-              <strong>Step 3:</strong> Stop the development server (if it's running) and restart it with <code>bun run dev</code> for the changes to take effect.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  if (apiKeyMissing) {
-    return (
-      <div className="flex flex-col h-screen bg-gradient-to-br from-background to-muted/20">
-        <div className="border-b bg-card/50 backdrop-blur-sm p-4">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
-            <h2 className="text-xl font-bold">Initial Setup Required</h2>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          <ApiKeySetupGuide />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-background via-background to-muted/20">

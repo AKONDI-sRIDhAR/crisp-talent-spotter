@@ -52,6 +52,8 @@ interface InterviewStore {
   updateCandidate: (id: string, updates: Partial<Candidate>) => void;
 
   // Interview state
+  interviewStep: 'form' | 'pre-interview-check' | 'interview';
+  setInterviewStep: (step: 'form' | 'pre-interview-check' | 'interview') => void;
   currentQuestion: InterviewQuestion | null;
   setCurrentQuestion: (question: InterviewQuestion | null) => void;
   
@@ -92,6 +94,9 @@ export const useInterviewStore = create<InterviewStore>()(
 
       currentCandidate: null,
       setCurrentCandidate: (candidate) => set({ currentCandidate: candidate }),
+
+      interviewStep: 'form',
+      setInterviewStep: (step) => set({ interviewStep: step }),
 
       candidates: [],
       addCandidate: (candidate) => set((state) => ({ 

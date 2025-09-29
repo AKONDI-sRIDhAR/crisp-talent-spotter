@@ -6,33 +6,51 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-// FIX: Removed imports for pdfjsLib and mammoth, as they are not browser compatible.
+import { useInterviewStore } from '@/store/interviewStore';
+import { aiService } from '@/services/aiService';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Setup the worker source for pdfjs
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.mjs',
+  import.meta.url,
+).toString();
+
 
 interface CandidateFormProps {
-  // Updated signature to correctly pass the required data structure
   onComplete: (data: { name: string; email: string; phone: string; resumeText: string; resumeDataUrl: string; resumeSummary: string | null; }) => void;
 }
 
 const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
+  const { apiKey, setExtractedData, extractedData } = useInterviewStore();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: ''
   });
-  // The resumeText will now be a simulated placeholder.
   const [resumeText, setResumeText] = useState('');
   const [resumeDataUrl, setResumeDataUrl] = useState('');
+  const [resumeSummary, setResumeSummary] = useState<string | null>(null);
   const [fileName, setFileName] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (extractedData) {
+      setFormData({
+        name: extractedData.name || '',
+        email: extractedData.email || '',
+        phone: extractedData.phone || ''
+      });
+    }
+  }, [extractedData]);
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (error) setError('');
   };
 
-  // Helper function to read file as Data URL
   const readFileAsDataURL = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -50,37 +68,40 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
     setIsParsing(true);
     setFileName(file.name);
 
-    // DOCX rejection kept for clarity.
     if (file.type.includes('docx')) {
-      setError('DOCX files are not supported for viewing yet. Please upload a PDF.');
+      setError('DOCX files are not supported yet. Please upload a PDF.');
       setIsParsing(false);
       return;
     }
 
     try {
-      // 1. Get the Data URL for storage/viewing
       const dataUrl = await readFileAsDataURL(file);
       setResumeDataUrl(dataUrl);
 
-      // 2. Use a guaranteed placeholder text since client-side parsing is unreliable
-      const placeholderText = `
-        Candidate Resume Text Placeholder.
-        Note: The original complex PDF/DOCX parsing was removed due to browser compatibility issues. 
-        AI services will use this placeholder text and the context of the interview.
-      `;
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+      let textContent = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const text = await page.getTextContent();
+        textContent += text.items.map(item => ('str' in item ? item.str : '')).join(' ');
+      }
+      setResumeText(textContent);
 
-      setResumeText(placeholderText); 
+      // Extract data using AI service
+      const extracted = await aiService.extractResumeData(textContent, apiKey);
 
-      // Clear fields on new file upload to ensure required fields are updated/verified
-      setFormData(prev => ({
-        name: '',
-        email: '',
-        phone: ''
-      }));
+      setFormData({
+        name: extracted.name || '',
+        email: extracted.email || '',
+        phone: extracted.phone || ''
+      });
+      setResumeSummary(extracted.summary);
+      setExtractedData(extracted);
 
     } catch (err) {
       console.error('Error handling file:', err);
-      setError('Failed to read the selected file into memory.');
+      setError('Failed to parse the PDF file. Please check the console for details.');
     } finally {
       setIsParsing(false);
     }
@@ -94,35 +115,12 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
       return;
     }
 
-    // Validation
-    if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim()) {
-      setError('Please fill in all required fields.');
-      return;
-    }
-    
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-
-    // Format the phone number to the Indian standard (+91) before submission.
-    let phone = formData.phone.replace(/[^0-9]/g, ''); // Remove all non-digit characters.
-
-    if (phone.length > 10) {
-      // take the last 10 digits to ensure a consistent format.
-      phone = phone.slice(-10);
-    }
-    const formattedPhone = `+91${phone}`;
-
-    // Call onComplete with null for resumeSummary as extraction is removed
+    // Validation is now handled by PreInterviewCheck
     onComplete({
       ...formData,
-      phone: formattedPhone,
       resumeText,
       resumeDataUrl,
-      resumeSummary: null, // Always pass null now
+      resumeSummary,
     });
   };
 

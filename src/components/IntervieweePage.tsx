@@ -55,15 +55,8 @@ const IntervieweePage: React.FC = () => {
   }, [currentCandidate, finishInterview]);
 
   useEffect(() => {
-    // If there's a candidate in the store, we are in an active interview
-    if (currentCandidate && currentCandidate.status !== 'completed') {
-      setStep('interview');
-    }
-  }, [currentCandidate]);
-
-  useEffect(() => {
     // Enhanced window violation detection for interview security
-    if (step !== 'interview' || !currentCandidate || isDisqualified) {
+    if (interviewStep !== 'interview' || !currentCandidate || isDisqualified) {
       return;
     }
 
@@ -114,22 +107,11 @@ const IntervieweePage: React.FC = () => {
       }
     };
 
-    // Right-click prevention
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      return false;
-    };
-
-    // Key combination prevention (Alt+Tab, Ctrl+Tab, etc.)
+    // Simplified Key combination prevention
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent Alt+Tab, Ctrl+Tab, Windows key, F11, etc.
       if (
-        (e.altKey && e.key === 'Tab') ||
-        (e.ctrlKey && e.key === 'Tab') ||
-        e.key === 'Meta' ||
-        e.key === 'F11' ||
         (e.ctrlKey && e.shiftKey && e.key === 'I') || // Dev tools
-        (e.key === 'F12') // Dev tools
+        e.key === 'F12' // Dev tools
       ) {
         e.preventDefault();
         processViolation();
@@ -153,11 +135,10 @@ const IntervieweePage: React.FC = () => {
     // Initialize security measures
     enterFullscreen();
 
-    // Add all event listeners
+    // Add simplified event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('keydown', handleKeyDown);
 
     // Cleanup function
@@ -165,15 +146,13 @@ const IntervieweePage: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('keydown', handleKeyDown);
       
-      // Exit fullscreen when component unmounts
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => {});
       }
     };
-  }, [step, currentCandidate, isDisqualified, terminateInterview]);
+  }, [interviewStep, currentCandidate, isDisqualified, terminateInterview]);
 
   const startNewInterview = (data: NewCandidateData) => {
     // Create a new candidate
