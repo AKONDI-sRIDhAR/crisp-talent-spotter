@@ -7,10 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 // FIX: Removed imports for pdfjsLib and mammoth, as they are not browser compatible.
-// import * as pdfjsLib from 'pdfjs-dist';
-// import mammoth from 'mammoth';
-
-// NOTE: GlobalWorkerOptions setup is also removed.
 
 interface CandidateFormProps {
   // Updated signature to correctly pass the required data structure
@@ -36,26 +32,6 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
     if (error) setError('');
   };
 
-  // NOTE: extractInfoFromText is preserved but simplified, as it will run on placeholder text.
-  const extractInfoFromText = (text: string) => {
-    // Simple regex for email
-    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
-    const emailMatch = text.match(emailRegex);
-    if (emailMatch) {
-      handleInputChange('email', emailMatch[0]);
-    }
-
-    // Regex for phone (handles various formats)
-    const phoneRegex = /(\+?\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?[\d\s-]{7,15}/;
-    const phoneMatch = text.match(phoneRegex);
-    if (phoneMatch) {
-      handleInputChange('phone', phoneMatch[0].replace(/\D/g, ''));
-    }
-
-    // NOTE: Name extraction has been removed as per user feedback due to unreliability.
-    // The user is now required to enter their name manually to ensure accuracy.
-  };
-
   // Helper function to read file as Data URL
   const readFileAsDataURL = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -74,6 +50,13 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
     setIsParsing(true);
     setFileName(file.name);
 
+    // DOCX rejection kept for clarity.
+    if (file.type.includes('docx')) {
+      setError('DOCX files are not supported for viewing yet. Please upload a PDF.');
+      setIsParsing(false);
+      return;
+    }
+
     try {
       // 1. Get the Data URL for storage/viewing
       const dataUrl = await readFileAsDataURL(file);
@@ -86,11 +69,15 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
         AI services will use this placeholder text and the context of the interview.
       `;
 
-      // Simulating minor extraction based on placeholder text (optional, but harmless)
-      extractInfoFromText(placeholderText);
       setResumeText(placeholderText); 
 
-      // Reset fields if an existing file failed (now irrelevant, as parsing is removed)
+      // Clear fields on new file upload to ensure required fields are updated/verified
+      setFormData(prev => ({
+        name: '',
+        email: '',
+        phone: ''
+      }));
+
     } catch (err) {
       console.error('Error handling file:', err);
       setError('Failed to read the selected file into memory.');
@@ -121,17 +108,15 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
     }
 
     // Format the phone number to the Indian standard (+91) before submission.
-    let phone = formData.phone.replace(/\D/g, ''); // Remove all non-digit characters.
+    let phone = formData.phone.replace(/[^0-9]/g, ''); // Remove all non-digit characters.
 
     if (phone.length > 10) {
-      // If the number includes a country code (e.g., 919876543210) or leading zero,
       // take the last 10 digits to ensure a consistent format.
       phone = phone.slice(-10);
     }
-
     const formattedPhone = `+91${phone}`;
 
-    // Call onComplete with the formatted phone number and other data.
+    // Call onComplete with null for resumeSummary as extraction is removed
     onComplete({
       ...formData,
       phone: formattedPhone,
