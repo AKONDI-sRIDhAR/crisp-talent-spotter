@@ -47,121 +47,6 @@ const InterviewChat: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  const generateNextQuestion = useCallback(async () => {
-    const latestCandidate = useInterviewStore.getState().currentCandidate;
-    if (!latestCandidate) return;
-
-
-    const questionIndex = latestCandidate.currentQuestionIndex;
-    if (questionIndex >= 6) {
-      await finishInterviewProcess();
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
-      const difficulty = difficulties[latestCandidate.currentQuestionIndex];
-      const previousQuestions = latestCandidate.answers.map(a => a.question);
-      
-      // Pass apiKey to the service call
-      const questionData = await aiService.generateQuestion(difficulty, previousQuestions, apiKey);
-      
-      setCurrentQuestion(questionData);
-      setTimeRemaining(questionData.timeLimit);
-      
-      const questionMessage: Message = {
-        id: `question-${latestCandidate.currentQuestionIndex}`,
-        type: 'ai',
-        content: `Question ${latestCandidate.currentQuestionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
-        timestamp: new Date(),
-        isQuestion: true,
-        options: questionData.options,
-      };
-      
-      setMessages(prev => [...prev, questionMessage]);
-      setTimerActive(true);
-    } catch (error) {
-      console.error('Error generating question:', error);
-      const errorMessage: Message = {
-        id: `error-${Date.now()}`,
-        type: 'ai',
-        content: `I apologize, but there was an error generating the next question. Please try refreshing the page.`,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [apiKey, finishInterviewProcess, setCurrentQuestion, setTimeRemaining, setTimerActive]);
-
-  const handleSubmitAnswer = useCallback(async () => {
-    if (!selectedOption || !currentQuestion || !currentCandidate) return;
-
-    const timeUsed = currentQuestion.timeLimit - timeRemaining;
-    const userMessage: Message = { id: `answer-${Date.now()}`, type: 'user', content: selectedOption, timestamp: new Date() };
-
-    setMessages(prev => [...prev, userMessage]);
-    setTimerActive(false);
-    setSelectedOption('');
-    setIsLoading(true);
-
-    submitAnswer(selectedOption, timeUsed);
-
-    const latestCandidate = useInterviewStore.getState().currentCandidate;
-    if (latestCandidate && latestCandidate.answers.length >= 6) {
-      await finishInterviewProcess();
-      return;
-    }
-
-    const transitionMessage: Message = { id: `transition-${Date.now()}`, type: 'ai', content: 'Answer recorded! Moving to the next question...', timestamp: new Date() };
-    setMessages(prev => [...prev, transitionMessage]);
-
-    nextQuestion();
-    setIsLoading(false);
-  }, [selectedOption, currentQuestion, currentCandidate, timeRemaining, setTimerActive, submitAnswer, nextQuestion]);
-
-  const handleTimeUp = useCallback(() => {
-    setSelectedOption(prev => prev || 'No answer selected due to time limit.');
-    handleSubmitAnswer();
-  }, [handleSubmitAnswer]);
-
-  useEffect(() => {
-    if (timerActive && timeRemaining > 0) {
-      timerRef.current = setTimeout(() => setTimeRemaining(timeRemaining - 1), 1000);
-    } else if (timerActive && timeRemaining <= 0) {
-      handleTimeUp();
-    }
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [timerActive, timeRemaining, setTimeRemaining, handleTimeUp]);
-
-
-  useEffect(() => {
-    if (!currentCandidate) return;
-
-    if (messages.length === 0) {
-      const welcomeMessage: Message = {
-        id: 'welcome',
-        type: 'ai',
-        content: `Welcome, ${currentCandidate.name}! I'm your AI interviewer. You'll be taking a technical interview with 6 questions of increasing difficulty. Let's begin!`,
-        timestamp: new Date(),
-      };
-      setMessages([welcomeMessage]);
-      return;
-    }
-
-    const questionAlreadyExists = messages.some(
-      (m) => m.id === `question-${currentCandidate.currentQuestionIndex}`
-    );
-
-    if (!questionAlreadyExists && !isLoading) {
-      generateNextQuestion();
-    }
-  }, [currentCandidate, messages, isLoading, generateNextQuestion, apiKey]);
-
-
   const finishInterviewProcess = useCallback(async () => {
     const latestCandidate = useInterviewStore.getState().currentCandidate;
     if (!latestCandidate) return;
@@ -177,7 +62,6 @@ const InterviewChat: React.FC = () => {
         let comment = 'No answer was provided before the time ran out.';
 
         if (answer.answer !== 'No answer selected due to time limit.') {
-          // Pass apiKey to the service call
           const aiResult = await aiService.scoreAnswer(
             answer.question,
             answer.answer,
@@ -187,15 +71,14 @@ const InterviewChat: React.FC = () => {
           score = aiResult.score;
           comment = aiResult.comment;
         }
-        
+
         const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
         const scoredAnswer = { ...answer, aiScore: score, aiComment: comment };
-        
+
         scoredAnswers.push(scoredAnswer);
         finalTotalScore += weightedScore;
       }
 
-      // Pass apiKey and resumeSummary to the service call
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
         latestCandidate.name,
@@ -227,11 +110,119 @@ const InterviewChat: React.FC = () => {
         aiSummary: 'An error occurred during the final analysis.',
         score: 0,
       };
-      finishInterview(candidateOnError); 
+      finishInterview(candidateOnError);
     } finally {
       setIsLoading(false);
     }
   }, [apiKey, finishInterview]);
+
+  const generateNextQuestion = useCallback(async () => {
+    const latestCandidate = useInterviewStore.getState().currentCandidate;
+    if (!latestCandidate) return;
+
+    const questionIndex = latestCandidate.currentQuestionIndex;
+    if (questionIndex >= 6) {
+      await finishInterviewProcess();
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
+      const difficulty = difficulties[latestCandidate.currentQuestionIndex];
+      const previousQuestions = latestCandidate.answers.map(a => a.question);
+      
+      const questionData = await aiService.generateQuestion(difficulty, previousQuestions, apiKey);
+      
+      setCurrentQuestion(questionData);
+      setTimeRemaining(questionData.timeLimit);
+      
+      const questionMessage: Message = {
+        id: `question-${latestCandidate.currentQuestionIndex}`,
+        type: 'ai',
+        content: `Question ${latestCandidate.currentQuestionIndex + 1}/6 (${difficulty.toUpperCase()} - ${questionData.timeLimit}s)\n\n${questionData.question}`,
+        timestamp: new Date(),
+        isQuestion: true,
+        options: questionData.options,
+      };
+      
+      setMessages(prev => [...prev, questionMessage]);
+      setTimerActive(true);
+    } catch (error) {
+      console.error('Error generating question:', error);
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        type: 'ai',
+        content: `I apologize, but there was an error generating the next question. Please try refreshing the page.`,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiKey, setCurrentQuestion, setTimeRemaining, setTimerActive, finishInterviewProcess]);
+
+  const handleSubmitAnswer = useCallback(async (answerToSubmit: string) => {
+    if (!answerToSubmit || !currentQuestion || !currentCandidate) return;
+
+    const timeUsed = currentQuestion.timeLimit - timeRemaining;
+    const userMessage: Message = { id: `answer-${Date.now()}`, type: 'user', content: answerToSubmit, timestamp: new Date() };
+
+    setMessages(prev => [...prev, userMessage]);
+    setTimerActive(false);
+    setSelectedOption('');
+    setIsLoading(true);
+
+    submitAnswer(answerToSubmit, timeUsed);
+
+    const latestCandidate = useInterviewStore.getState().currentCandidate;
+    if (latestCandidate && latestCandidate.answers.length >= 6) {
+      await finishInterviewProcess();
+    } else {
+      const transitionMessage: Message = { id: `transition-${Date.now()}`, type: 'ai', content: 'Answer recorded! Moving to the next question...', timestamp: new Date() };
+      setMessages(prev => [...prev, transitionMessage]);
+      nextQuestion();
+      setIsLoading(false);
+    }
+  }, [currentQuestion, currentCandidate, timeRemaining, setTimerActive, submitAnswer, nextQuestion, finishInterviewProcess]);
+
+  const handleTimeUp = useCallback(() => {
+    handleSubmitAnswer(selectedOption || 'No answer selected due to time limit.');
+  }, [handleSubmitAnswer, selectedOption]);
+
+  useEffect(() => {
+    if (timerActive && timeRemaining > 0) {
+      timerRef.current = setTimeout(() => setTimeRemaining(timeRemaining - 1), 1000);
+    } else if (timerActive && timeRemaining <= 0) {
+      handleTimeUp();
+    }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [timerActive, timeRemaining, setTimeRemaining, handleTimeUp]);
+
+  useEffect(() => {
+    if (!currentCandidate) return;
+
+    if (messages.length === 0) {
+      const welcomeMessage: Message = {
+        id: 'welcome',
+        type: 'ai',
+        content: `Welcome, ${currentCandidate.name}! I'm your AI interviewer. You'll be taking a technical interview with 6 questions of increasing difficulty. Let's begin!`,
+        timestamp: new Date(),
+      };
+      setMessages([welcomeMessage]);
+      return;
+    }
+
+    const questionAlreadyExists = messages.some(
+      (m) => m.id === `question-${currentCandidate.currentQuestionIndex}`
+    );
+
+    if (!questionAlreadyExists && !isLoading) {
+      generateNextQuestion();
+    }
+  }, [currentCandidate, messages, isLoading, generateNextQuestion]);
 
   if (!currentCandidate) return null;
 
@@ -379,7 +370,7 @@ const InterviewChat: React.FC = () => {
         >
           <div className="max-w-4xl mx-auto flex justify-center">
             <Button 
-              onClick={handleSubmitAnswer} 
+                onClick={() => handleSubmitAnswer(selectedOption)}
               disabled={!selectedOption || isLoading} 
               size="lg" 
               className="px-8 py-3 text-lg font-medium bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105"
