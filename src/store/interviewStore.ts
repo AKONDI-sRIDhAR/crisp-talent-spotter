@@ -7,7 +7,6 @@ export interface Candidate {
   email: string;
   phone: string;
   resumeText?: string;
-  resumeFile?: File;
   resumeDataUrl?: string;
   resumeSummary?: string | null;
   score: number;
