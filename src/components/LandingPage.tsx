@@ -58,13 +58,14 @@ const LandingPage: React.FC = () => {
               transition={{ delay: 0.3, duration: 0.6 }}
             >
               <ScrambledText 
-                className="text-6xl md:text-8xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent tracking-tight scrambled-text-demo"
+                // Retain gradient classes, the fix is in ScrambledText.tsx
+                className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent tracking-tight scrambled-text-demo"
                 radius={100}
                 duration={1.2}
                 speed={0.5}
                 scrambleChars=".:"
               >
-                CRISP
+                CRISP-TALENT-SPOTTER
               </ScrambledText>
             </motion.div>
             
