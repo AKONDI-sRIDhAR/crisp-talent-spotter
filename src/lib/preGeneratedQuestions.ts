@@ -1,4 +1,4 @@
-import { InterviewQuestion } from '../store/interviewStore';
+import { InterviewQuestion } from '../store/interviewSlice';
 
 export const questionSets: InterviewQuestion[][] = [
   // Set 1

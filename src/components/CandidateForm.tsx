@@ -1,39 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Phone, FileUp, ArrowRight, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, FileUp, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useInterviewStore } from '@/store/interviewStore';
-import { aiService } from '@/services/aiService';
-import * as pdfjsLib from 'pdfjs-dist';
-import mammoth from 'mammoth';
-
-// Setup the worker source for pdfjs
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.mjs',
-  import.meta.url,
-).toString();
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { setExtractedData } from '@/store/interviewSlice';
 
 
 interface CandidateFormProps {
-  onComplete: (data: { name: string; email: string; phone: string; resumeText: string; resumeDataUrl: string; resumeSummary: string | null; }) => void;
+  onComplete: (data: { name: string; email: string; phone: string; resumeDataUrl: string; }) => void;
 }
 
 const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
-  const { apiKey, setExtractedData, extractedData } = useInterviewStore();
+  const dispatch = useAppDispatch();
+  const extractedData = useAppSelector((state) => state.interview.extractedData);
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: ''
   });
-  const [resumeText, setResumeText] = useState('');
   const [resumeDataUrl, setResumeDataUrl] = useState('');
-  const [resumeSummary, setResumeSummary] = useState<string | null>(null);
   const [fileName, setFileName] = useState('');
-  const [isParsing, setIsParsing] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -66,50 +57,27 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
     if (!file) return;
 
     setError('');
-    setIsParsing(true);
     setFileName(file.name);
+
+    // Validate file type
+    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!validTypes.includes(file.type) && !file.name.endsWith('.pdf') && !file.name.endsWith('.docx')) {
+      setError('Please upload a PDF or DOCX file.');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File size must be less than 10MB.');
+      return;
+    }
 
     try {
       const dataUrl = await readFileAsDataURL(file);
       setResumeDataUrl(dataUrl);
-
-      const arrayBuffer = await file.arrayBuffer();
-      let textContent = '';
-
-      if (file.type === 'application/pdf') {
-        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const text = await page.getTextContent();
-          textContent += text.items.map(item => ('str' in item ? item.str : '')).join(' ');
-        }
-      } else if (file.name.endsWith('.docx')) {
-        const result = await mammoth.extractRawText({ arrayBuffer });
-        textContent = result.value;
-      } else {
-        setError('Unsupported file type. Please upload a PDF or DOCX file.');
-        setIsParsing(false);
-        return;
-      }
-
-      setResumeText(textContent);
-
-      // Extract data using AI service
-      const extracted = await aiService.extractResumeData(textContent, apiKey);
-
-      setFormData({
-        name: extracted.name || '',
-        email: extracted.email || '',
-        phone: extracted.phone || ''
-      });
-      setResumeSummary(extracted.summary);
-      setExtractedData(extracted);
-
     } catch (err) {
       console.error('Error handling file:', err);
-      setError('Failed to parse the resume file. Please check the console for details.');
-    } finally {
-      setIsParsing(false);
+      setError('Failed to upload the file. Please try again.');
     }
   };
 
@@ -121,12 +89,12 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
       return;
     }
 
-    // Validation is now handled by PreInterviewCheck
+    // Store form data for validation in next step
+    dispatch(setExtractedData(formData));
+    
     onComplete({
       ...formData,
-      resumeText,
       resumeDataUrl,
-      resumeSummary,
     });
   };
 
@@ -143,7 +111,7 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
             AI Technical Interview
           </h1>
           <p className="text-muted-foreground mt-2">
-            Upload your resume and confirm your details to begin.
+            Enter your details and upload your resume to begin.
           </p>
         </div>
 
@@ -166,16 +134,13 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
                   onChange={handleFileChange}
                   accept=".pdf,.docx"
                   className="hidden"
-                  disabled={isParsing}
                 />
                 <Button
                   type="button"
                   variant="outline"
                   className="w-full justify-start text-muted-foreground"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={isParsing}
                 >
-                  {isParsing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   {fileName || 'Select a file...'}
                 </Button>
               </div>
@@ -242,9 +207,7 @@ const CandidateForm: React.FC<CandidateFormProps> = ({ onComplete }) => {
               <Button 
                 type="submit" 
                 className="w-full h-12 text-lg font-medium bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 shadow-lg hover:shadow-xl"
-                disabled={isParsing}
               >
-                {isParsing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Start Interview
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>

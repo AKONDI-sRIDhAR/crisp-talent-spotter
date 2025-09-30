@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { InterviewAnswer, InterviewQuestion } from '../store/interviewStore';
-// NOTE: The external import for staticQuestions is removed and the function is defined locally.
+import { InterviewAnswer, InterviewQuestion } from '../store/interviewSlice';
 
 // --- Local Fallback Implementation ---
 /**

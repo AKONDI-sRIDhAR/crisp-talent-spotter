@@ -7,15 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useInterviewStore, Candidate } from '@/store/interviewStore';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { setCurrentMode, Candidate } from '@/store/interviewSlice';
 
 const InterviewerDashboard: React.FC = () => {
+  const dispatch = useAppDispatch();
+  const candidates = useAppSelector((state) => state.interview.candidates);
+  
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'score' | 'name' | 'date'>('score');
   const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'in-progress' | 'pending'>('all');
-
-  const { candidates, setCurrentMode } = useInterviewStore();
 
   const filteredAndSortedCandidates = candidates
     .filter(candidate => {
@@ -255,7 +257,7 @@ const InterviewerDashboard: React.FC = () => {
           </div>
           <Button
             variant="outline"
-            onClick={() => setCurrentMode('landing')}
+            onClick={() => dispatch(setCurrentMode('landing'))}
             className="flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />

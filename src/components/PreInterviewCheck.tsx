@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useInterviewStore } from '@/store/interviewStore';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { updateCandidate, setInterviewStep } from '@/store/interviewSlice';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Bot } from 'lucide-react'; // Merged Bot import
-import { toast } from "sonner"; // Used for toast notifications
+import { Loader2, Bot } from 'lucide-react';
 
 type MissingField = 'name' | 'email' | 'phone' | null;
 
 const PreInterviewCheck: React.FC = () => {
-  const { currentCandidate, updateCandidate, setInterviewStep } = useInterviewStore();
+  const dispatch = useAppDispatch();
+  const currentCandidate = useAppSelector((state) => state.interview.currentCandidate);
   const [missingField, setMissingField] = useState<MissingField>(null);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(''); // Kept error state for input validation
+  const [error, setError] = useState('');
 
   // Function to check candidate data and set the next missing field state
   const validateAndSetNextField = (candidate: typeof currentCandidate) => {
@@ -42,7 +43,7 @@ const PreInterviewCheck: React.FC = () => {
 
     // All fields present, proceed
     setMissingField(null);
-    setInterviewStep('interview');
+    dispatch(setInterviewStep('interview'));
   };
 
   // Effect to trigger re-check whenever currentCandidate changes (i.e., after an update)
@@ -50,10 +51,11 @@ const PreInterviewCheck: React.FC = () => {
     validateAndSetNextField(currentCandidate);
     // Pre-fill input with any existing value to help the user correct it
     if (currentCandidate && missingField) {
-      const initialValue = currentCandidate[missingField as keyof typeof currentCandidate] || '';
+      const field = currentCandidate[missingField];
+      const initialValue = typeof field === 'string' ? field : '';
       setInputValue(initialValue);
     }
-  }, [currentCandidate, missingField]); 
+  }, [currentCandidate, missingField]);
 
   const getPrompt = () => {
     switch (missingField) {
@@ -102,7 +104,7 @@ const PreInterviewCheck: React.FC = () => {
 
     setIsLoading(true);
     // Update the candidate in the store with the validated information
-    updateCandidate(currentCandidate.id, { [missingField]: valueToSubmit });
+    dispatch(updateCandidate({ id: currentCandidate.id, updates: { [missingField]: valueToSubmit } }));
 
     // The useEffect hook will now re-run, find the next missing field or proceed to 'interview'
     setInputValue('');

@@ -4,14 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Users, Bot, Sparkles, Timer, ArrowRight, Zap } from 'lucide-react';
 import LiquidEther from './LiquidEther';
-import { useInterviewStore } from '@/store/interviewStore';
+import ScrambledText from './ScrambledText';
+import { useAppDispatch } from '@/store/hooks';
+import { setCurrentMode, setCurrentCandidate, setInterviewStep } from '@/store/interviewSlice';
 
 const LandingPage: React.FC = () => {
-  const { 
-    setCurrentMode, 
-    setCurrentCandidate,
-    setInterviewStep
-  } = useInterviewStore();
+  const dispatch = useAppDispatch();
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background via-background to-muted/10">
@@ -54,14 +52,21 @@ const LandingPage: React.FC = () => {
               </div>
             </motion.div>
             
-            <motion.h1 
-              className="text-6xl md:text-8xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent tracking-tight"
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.6 }}
             >
-              Crisp
-            </motion.h1>
+              <ScrambledText 
+                className="text-6xl md:text-8xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent tracking-tight scrambled-text-demo"
+                radius={100}
+                duration={1.2}
+                speed={0.5}
+                scrambleChars=".:"
+              >
+                SWIPE AI Interview Assistant
+              </ScrambledText>
+            </motion.div>
             
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -119,9 +124,9 @@ const LandingPage: React.FC = () => {
                   
                   <Button 
                     onClick={() => {
-                      setCurrentMode('interviewee');
-                      setCurrentCandidate(null);
-                      setInterviewStep('form'); // Reset the flow to the beginning
+                      dispatch(setCurrentMode('interviewee'));
+                      dispatch(setCurrentCandidate(null));
+                      dispatch(setInterviewStep('form'));
                     }}
                     className="w-full mt-6 h-12 text-lg font-medium bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all duration-300 shadow-lg group-hover:shadow-2xl"
                     size="lg"
@@ -166,7 +171,7 @@ const LandingPage: React.FC = () => {
                   
                   <Button 
                     variant="outline"
-                    onClick={() => setCurrentMode('interviewer-login')}
+                    onClick={() => dispatch(setCurrentMode('interviewer-login'))}
                     className="w-full mt-6 h-12 text-lg font-medium border-accent/30 text-accent hover:bg-accent/10 hover:border-accent/50 transition-all duration-300 shadow-lg group-hover:shadow-2xl"
                     size="lg"
                   >

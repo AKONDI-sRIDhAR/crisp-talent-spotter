@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, User, Trophy, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Bot, User, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 import Timer from '@/components/ui/timer';
-import { useInterviewStore, Candidate } from '@/store/interviewStore'; // Assuming Candidate type is exported from store
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { 
+  setCurrentQuestion, 
+  setTimerActive, 
+  setTimeRemaining, 
+  submitAnswer, 
+  nextQuestion, 
+  finishInterview,
+  Candidate 
+} from '@/store/interviewSlice';
 import { aiService } from '@/services/aiService';
 
 interface Message {
@@ -19,25 +27,18 @@ interface Message {
 }
 
 const InterviewChat: React.FC = () => {
+  const dispatch = useAppDispatch();
+  const currentCandidate = useAppSelector((state) => state.interview.currentCandidate);
+  const currentQuestion = useAppSelector((state) => state.interview.currentQuestion);
+  const timerActive = useAppSelector((state) => state.interview.timerActive);
+  const timeRemaining = useAppSelector((state) => state.interview.timeRemaining);
+  const apiKey = useAppSelector((state) => state.interview.apiKey);
+  
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedOption, setSelectedOption] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout>();
-
-  const {
-    currentCandidate,
-    currentQuestion,
-    setCurrentQuestion,
-    timerActive,
-    setTimerActive,
-    timeRemaining,
-    setTimeRemaining,
-    submitAnswer,
-    nextQuestion,
-    finishInterview,
-    apiKey
-  } = useInterviewStore();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -48,8 +49,8 @@ const InterviewChat: React.FC = () => {
   }, [messages]);
 
   const finishInterviewProcess = useCallback(async () => {
-    const latestCandidate = useInterviewStore.getState().currentCandidate;
-    if (!latestCandidate) return;
+    if (!currentCandidate) return;
+    const latestCandidate = currentCandidate;
 
     setIsLoading(true);
     try {
@@ -82,7 +83,7 @@ const InterviewChat: React.FC = () => {
       const { summary } = await aiService.generateFinalSummary(
         scoredAnswers,
         latestCandidate.name,
-        latestCandidate.resumeSummary || null,
+        null,
         apiKey!
       );
 
@@ -100,7 +101,7 @@ const InterviewChat: React.FC = () => {
         : `🎉 **Interview Complete!**\n\nThank you for taking the interview, ${latestCandidate.name}! Your responses have been saved.`;
 
       setMessages(prev => [...prev, { id: 'final', type: 'ai', content: finalMessageContent, timestamp: new Date() }]);
-      setTimeout(() => finishInterview(finalCandidate), 5000);
+      setTimeout(() => dispatch(finishInterview(finalCandidate)), 5000);
     } catch (error) {
       console.error('Error finishing interview:', error);
       const candidateOnError = {
@@ -110,15 +111,15 @@ const InterviewChat: React.FC = () => {
         aiSummary: 'An error occurred during the final analysis.',
         score: 0,
       };
-      finishInterview(candidateOnError);
+      dispatch(finishInterview(candidateOnError));
     } finally {
       setIsLoading(false);
     }
-  }, [apiKey, finishInterview]);
+  }, [apiKey, dispatch, currentCandidate]);
 
   const generateNextQuestion = useCallback(async () => {
-    const latestCandidate = useInterviewStore.getState().currentCandidate;
-    if (!latestCandidate) return;
+    if (!currentCandidate) return;
+    const latestCandidate = currentCandidate;
 
     const questionIndex = latestCandidate.currentQuestionIndex;
     if (questionIndex >= 6) {
@@ -134,8 +135,8 @@ const InterviewChat: React.FC = () => {
       
       const questionData = await aiService.generateQuestion(difficulty, previousQuestions, apiKey);
       
-      setCurrentQuestion(questionData);
-      setTimeRemaining(questionData.timeLimit);
+      dispatch(setCurrentQuestion(questionData));
+      dispatch(setTimeRemaining(questionData.timeLimit));
       
       const questionMessage: Message = {
         id: `question-${latestCandidate.currentQuestionIndex}`,
@@ -147,7 +148,7 @@ const InterviewChat: React.FC = () => {
       };
       
       setMessages(prev => [...prev, questionMessage]);
-      setTimerActive(true);
+      dispatch(setTimerActive(true));
     } catch (error) {
       console.error('Error generating question:', error);
       const errorMessage: Message = {
@@ -160,7 +161,7 @@ const InterviewChat: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [apiKey, setCurrentQuestion, setTimeRemaining, setTimerActive, finishInterviewProcess]);
+  }, [apiKey, dispatch, currentCandidate, finishInterviewProcess]);
 
   const handleSubmitAnswer = useCallback(async (answerToSubmit: string) => {
     if (!answerToSubmit || !currentQuestion || !currentCandidate) return;
@@ -169,22 +170,22 @@ const InterviewChat: React.FC = () => {
     const userMessage: Message = { id: `answer-${Date.now()}`, type: 'user', content: answerToSubmit, timestamp: new Date() };
 
     setMessages(prev => [...prev, userMessage]);
-    setTimerActive(false);
+    dispatch(setTimerActive(false));
     setSelectedOption('');
     setIsLoading(true);
 
-    submitAnswer(answerToSubmit, timeUsed);
+    dispatch(submitAnswer({ answer: answerToSubmit, timeUsed }));
 
-    const latestCandidate = useInterviewStore.getState().currentCandidate;
-    if (latestCandidate && latestCandidate.answers.length >= 6) {
+    // Check current candidate after submission
+    if (currentCandidate && currentCandidate.answers.length >= 5) {
       await finishInterviewProcess();
     } else {
       const transitionMessage: Message = { id: `transition-${Date.now()}`, type: 'ai', content: 'Answer recorded! Moving to the next question...', timestamp: new Date() };
       setMessages(prev => [...prev, transitionMessage]);
-      nextQuestion();
+      dispatch(nextQuestion());
       setIsLoading(false);
     }
-  }, [currentQuestion, currentCandidate, timeRemaining, setTimerActive, submitAnswer, nextQuestion, finishInterviewProcess]);
+  }, [currentQuestion, currentCandidate, timeRemaining, dispatch, finishInterviewProcess]);
 
   const handleTimeUp = useCallback(() => {
     handleSubmitAnswer(selectedOption || 'No answer selected due to time limit.');
@@ -192,14 +193,14 @@ const InterviewChat: React.FC = () => {
 
   useEffect(() => {
     if (timerActive && timeRemaining > 0) {
-      timerRef.current = setTimeout(() => setTimeRemaining(timeRemaining - 1), 1000);
+      timerRef.current = setTimeout(() => dispatch(setTimeRemaining(timeRemaining - 1)), 1000);
     } else if (timerActive && timeRemaining <= 0) {
       handleTimeUp();
     }
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [timerActive, timeRemaining, setTimeRemaining, handleTimeUp]);
+  }, [timerActive, timeRemaining, dispatch, handleTimeUp]);
 
   useEffect(() => {
     if (!currentCandidate) return;

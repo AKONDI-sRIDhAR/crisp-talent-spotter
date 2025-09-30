@@ -6,40 +6,36 @@ import CandidateForm from './CandidateForm';
 import InterviewChat from './InterviewChat';
 import WelcomeBackModal from './WelcomeBackModal';
 import PreInterviewCheck from './PreInterviewCheck';
-import { useInterviewStore, Candidate } from '@/store/interviewStore';
-// NOTE: import { questionSets } from '@/lib/preGeneratedQuestions'; is removed, as questions are generated dynamically.
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { 
+  setInterviewStep, 
+  setCurrentCandidate, 
+  addCandidate, 
+  updateCandidate, 
+  setCurrentMode, 
+  finishInterview,
+  Candidate 
+} from '@/store/interviewSlice';
+import { toast } from "sonner";
 
 type NewCandidateData = {
   name: string;
   email: string;
   phone: string;
-  resumeText: string;
   resumeDataUrl: string;
-  resumeSummary: string | null;
 };
 
-import { toast } from "sonner";
-
 const IntervieweePage: React.FC = () => {
+  const dispatch = useAppDispatch();
+  const interviewStep = useAppSelector((state) => state.interview.interviewStep);
+  const currentCandidate = useAppSelector((state) => state.interview.currentCandidate);
+  const candidates = useAppSelector((state) => state.interview.candidates);
+  
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState(false);
   const [newCandidateData, setNewCandidateData] = useState<NewCandidateData | null>(null);
   const [existingCandidate, setExistingCandidate] = useState<Candidate | null>(null);
   const [violationCount, setViolationCount] = useState(0);
   const [isDisqualified, setIsDisqualified] = useState(false);
-
-  const { 
-    interviewStep, 
-    setInterviewStep,
-    currentCandidate,
-    setCurrentCandidate,
-    candidates,
-    addCandidate,
-    updateCandidate,
-    setCurrentMode,
-    finishInterview,
-    questionSetIndex, // Kept for minimal change, though unused
-    incrementQuestionSetIndex, // Kept for minimal change, though unused
-  } = useInterviewStore();
 
   const terminateInterview = useCallback(() => {
     if (!currentCandidate) return;
@@ -52,9 +48,9 @@ const IntervieweePage: React.FC = () => {
       score: 0,
     };
 
-    finishInterview(finalCandidate);
+    dispatch(finishInterview(finalCandidate));
     setIsDisqualified(true);
-  }, [currentCandidate, finishInterview]);
+  }, [currentCandidate, dispatch]);
 
   const enterFullscreen = async () => {
     try {
@@ -169,9 +165,7 @@ const IntervieweePage: React.FC = () => {
       name: data.name,
       email: data.email,
       phone: data.phone,
-      resumeText: data.resumeText,
       resumeDataUrl: data.resumeDataUrl,
-      resumeSummary: data.resumeSummary, // Ensure summary is passed
       score: 0,
       status: 'in-progress',
       startTime: new Date(),
@@ -182,14 +176,12 @@ const IntervieweePage: React.FC = () => {
 
     // Mark old interview as completed if starting a fresh one
     if (existingCandidate) {
-      updateCandidate(existingCandidate.id, { status: 'completed', endTime: new Date() });
+      dispatch(updateCandidate({ id: existingCandidate.id, updates: { status: 'completed', endTime: new Date() } }));
     }
 
-    addCandidate(newCandidate);
-    setCurrentCandidate(newCandidate);
-    
-    // FIX: Transition to the pre-check step for data verification
-    setInterviewStep('pre-interview-check');
+    dispatch(addCandidate(newCandidate));
+    dispatch(setCurrentCandidate(newCandidate));
+    dispatch(setInterviewStep('pre-interview-check'));
   };
 
   const handleFormComplete = (data: NewCandidateData) => {
@@ -209,8 +201,8 @@ const IntervieweePage: React.FC = () => {
 
   const handleResumeOldInterview = () => {
     if (existingCandidate) {
-      setCurrentCandidate(existingCandidate);
-      setInterviewStep('interview');
+      dispatch(setCurrentCandidate(existingCandidate));
+      dispatch(setInterviewStep('interview'));
       setShowWelcomeBackModal(false);
     }
   };
@@ -224,7 +216,7 @@ const IntervieweePage: React.FC = () => {
   };
 
   const handleBackToLanding = () => {
-    setCurrentMode('landing');
+    dispatch(setCurrentMode('landing'));
   };
 
   if (isDisqualified) {
