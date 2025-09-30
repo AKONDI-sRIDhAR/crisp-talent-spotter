@@ -1,73 +1,100 @@
-# Welcome to your Lovable project
+🤖 CRISP Talent Spotter: AI Technical Interview Platform
+CRISP (Candidate Research & Intelligent Screening Platform) is a modern web application designed to revolutionize the technical hiring process. It provides a highly dynamic and secure interview environment, using Google's Gemini API to generate real-time, adaptive technical questions and provide objective, detailed candidate scoring.
 
-## Project info
+This project was built using React, TypeScript, and Tailwind CSS, following modern web development best practices.
 
-**URL**: https://lovable.dev/projects/71eba802-79cb-48dc-a2b3-28976bde6342
+🚀 Live Demo
+Experience the platform live on Vercel:
 
-## How can I edit this code?
+https://crisp-talent-spotter.vercel.app/
 
-There are several ways of editing your application.
+✨ Features
+Candidate (Interviewee) Mode
+Dynamic AI Questions: Generates unique, progressive questions for Easy, Medium, and Hard difficulty levels.
 
-**Use Lovable**
+Secure Environment: Implements security checks (fullscreen enforcement, focus loss detection) to ensure interview integrity.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/71eba802-79cb-48dc-a2b3-28976bde6342) and start prompting.
+Real-Time Timer: Each question has a time limit (20s, 60s, or 120s) tracked with a dynamic UI timer.
 
-Changes made via Lovable will be committed automatically to this repo.
+State Persistence: Uses Redux Persist to save the session, allowing candidates to resume unfinished interviews.
 
-**Use your preferred IDE**
+Interviewer (Recruiter) Dashboard
+Login Protection: Simple root/root login for dashboard access.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Candidate Management: View all past and in-progress interviews.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Detailed Analytics: Access question-by-question responses, AI-generated scores (0-10), and personalized AI summary reports for every completed candidate.
 
-Follow these steps:
+🛠️ Technology Stack
+Frontend: React with TypeScript
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+Styling: Tailwind CSS & shadcn/ui
+
+Animation: Framer Motion and GSAP for fluid UI/scrambled text effects.
+
+State Management: Redux Toolkit and Redux Persist
+
+AI Integration: Google's Gemini API for question generation, scoring, and final summary creation.
+
+Bundler: Vite
+
+💻 Local Development
+Follow these steps to set up the project locally:
+
+Prerequisites
+You must have Node.js (v18+) and npm installed.
+
+# Clone the repository (replace <YOUR_GIT_URL> with the actual link)
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Navigate into the project directory
+cd crisp-talent-spotter
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install 
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+Running the Application
+Set the API Key:
+The AI service relies on the Gemini API. You will need to set your API key in the Redux store's initial state (in src/store/interviewSlice.ts).
+
+Start the Development Server:
+
 npm run dev
-```
 
-**Edit a file directly in GitHub**
+The application will be available at http://127.0.0.1:8080/ (or the address shown in your terminal).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Interviewer Credentials (Demo)
+To access the private dashboard locally:
 
-**Use GitHub Codespaces**
+Role
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Username
 
-## What technologies are used for this project?
+Password
 
-This project is built with:
+Interviewer
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+root
 
-## How can I deploy this project?
+root
 
-Simply open [Lovable](https://lovable.dev/projects/71eba802-79cb-48dc-a2b3-28976bde6342) and click on Share -> Publish.
+🚢 Deployment
+This project is configured for seamless deployment using services that integrate directly with Git.
 
-## Can I connect a custom domain to my Lovable project?
+Vercel Deployment (Current Host)
+The easiest method is using Vercel's automated workflow:
 
-Yes, you can!
+Push your final changes to the main branch of your GitHub repository.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Log in to Vercel and import your project from Git.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Vercel automatically detects the Vite setup, runs the build command (npm run build), and serves the static files from the generated /dist directory.
+
+Build Output
+To manually inspect the production build output:
+
+npm run build
+# The optimized files are placed in the 'dist' directory.
+
+🤝 Contributing
+We welcome contributions! If you have suggestions for new features, optimizations, or bug fixes, please submit a pull request or open an issue on the repository.
