@@ -44,8 +44,8 @@ Follow these steps to set up the project locally:
 Prerequisites
 You must have Node.js (v18+) and npm installed.
 
-# Clone the repository (replace <YOUR_GIT_URL> with the actual link)
-git clone <YOUR_GIT_URL>
+# Clone the repository 
+git clone https://github.com/AKONDI-sRIDhAR/crisp-talent-spotter
 
 # Navigate into the project directory
 cd crisp-talent-spotter
