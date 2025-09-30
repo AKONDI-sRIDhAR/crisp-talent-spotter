@@ -64,7 +64,7 @@ const LandingPage: React.FC = () => {
                 speed={0.5}
                 scrambleChars=".:"
               >
-                SWIPE AI Interview Assistant
+                CRISP
               </ScrambledText>
             </motion.div>
             
