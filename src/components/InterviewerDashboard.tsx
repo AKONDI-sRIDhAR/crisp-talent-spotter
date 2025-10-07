@@ -58,7 +58,26 @@ const InterviewerDashboard: React.FC = () => {
 
   const handleViewResume = (candidate: Candidate) => {
     if (candidate.resumeDataUrl) {
-      window.open(candidate.resumeDataUrl, '_blank', 'noopener,noreferrer');
+      // Create a new window and write the data URL as an iframe
+      const win = window.open('', '_blank');
+      if (win) {
+        win.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Resume - ${candidate.name}</title>
+              <style>
+                body { margin: 0; padding: 0; overflow: hidden; }
+                iframe { border: none; width: 100vw; height: 100vh; }
+              </style>
+            </head>
+            <body>
+              <iframe src="${candidate.resumeDataUrl}" width="100%" height="100%"></iframe>
+            </body>
+          </html>
+        `);
+        win.document.close();
+      }
     }
   };
 

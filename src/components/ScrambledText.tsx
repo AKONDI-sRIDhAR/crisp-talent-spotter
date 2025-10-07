@@ -7,6 +7,7 @@ interface ScrambledTextProps {
   duration?: number;
   speed?: number;
   scrambleChars?: string;
+  radius?: number; // Not used internally but accepted for API compatibility
 }
 
 const ScrambledText: React.FC<ScrambledTextProps> = ({

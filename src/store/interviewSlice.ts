@@ -129,8 +129,13 @@ const interviewSlice = createSlice({
     finishInterview: (state, action: PayloadAction<Candidate>) => {
       const index = state.candidates.findIndex(c => c.id === action.payload.id);
       if (index !== -1) {
-        state.candidates[index] = action.payload;
+        // Update existing candidate with all completed data
+        state.candidates[index] = { ...action.payload };
+      } else {
+        // Add candidate if not found (fallback)
+        state.candidates.push(action.payload);
       }
+      console.log('Candidate saved to Redux:', action.payload.name, 'Total candidates:', state.candidates.length);
       state.currentCandidate = null;
       state.currentQuestion = null;
       state.currentMode = 'landing';

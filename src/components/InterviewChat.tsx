@@ -58,19 +58,28 @@ const InterviewChat: React.FC = () => {
       let finalTotalScore = 0;
       const scoredAnswers = [];
 
+      console.log('Starting scoring process for', latestCandidate.answers.length, 'answers');
+
       for (const answer of latestCandidate.answers) {
         let score = 0;
         let comment = 'No answer was provided before the time ran out.';
 
-        if (answer.answer !== 'No answer selected due to time limit.') {
-          const aiResult = await aiService.scoreAnswer(
-            answer.question,
-            answer.answer,
-            answer.difficulty,
-            apiKey!
-          );
-          score = aiResult.score;
-          comment = aiResult.comment;
+        if (answer.answer && answer.answer !== 'No answer selected due to time limit.') {
+          try {
+            const aiResult = await aiService.scoreAnswer(
+              answer.question,
+              answer.answer,
+              answer.difficulty,
+              apiKey!
+            );
+            score = aiResult.score;
+            comment = aiResult.comment;
+            console.log(`Scored ${answer.difficulty} question:`, score, '/', 10);
+          } catch (error) {
+            console.error('Error scoring answer:', error);
+            score = 0;
+            comment = 'Error occurred during scoring.';
+          }
         }
 
         const weightedScore = (score / 10) * scoreWeights[answer.difficulty];
@@ -80,12 +89,22 @@ const InterviewChat: React.FC = () => {
         finalTotalScore += weightedScore;
       }
 
-      const { summary } = await aiService.generateFinalSummary(
-        scoredAnswers,
-        latestCandidate.name,
-        null,
-        apiKey!
-      );
+      console.log('Total weighted score:', finalTotalScore, '/ 15');
+
+      let summary = '';
+      try {
+        const summaryResult = await aiService.generateFinalSummary(
+          scoredAnswers,
+          latestCandidate.name,
+          null,
+          apiKey!
+        );
+        summary = summaryResult.summary;
+        console.log('Generated summary successfully');
+      } catch (error) {
+        console.error('Error generating summary:', error);
+        summary = `${latestCandidate.name} completed the interview with a score of ${finalTotalScore.toFixed(1)}/15. The detailed AI summary could not be generated due to an error.`;
+      }
 
       const finalCandidate: Candidate = {
         ...latestCandidate,
@@ -95,6 +114,13 @@ const InterviewChat: React.FC = () => {
         status: 'completed',
         endTime: new Date()
       };
+
+      console.log('Final candidate data:', { 
+        name: finalCandidate.name, 
+        score: finalCandidate.score, 
+        answersCount: finalCandidate.answers.length,
+        hasResume: !!finalCandidate.resumeDataUrl
+      });
 
       const finalMessageContent = summary && !summary.includes('disabled')
         ? `🎉 **Interview Complete!**\n\n**Final Score: ${finalTotalScore.toFixed(1)}/15**\n\n${summary}\n\nThank you for taking the interview, ${latestCandidate.name}!`
@@ -106,9 +132,10 @@ const InterviewChat: React.FC = () => {
       console.error('Error finishing interview:', error);
       const candidateOnError = {
         ...latestCandidate,
+        answers: latestCandidate.answers.map(a => ({ ...a, aiScore: 0, aiComment: 'Error during scoring' })),
         status: 'completed' as const,
         endTime: new Date(),
-        aiSummary: 'An error occurred during the final analysis.',
+        aiSummary: `${latestCandidate.name} completed the interview. An error occurred during the final analysis.`,
         score: 0,
       };
       dispatch(finishInterview(candidateOnError));
@@ -175,14 +202,15 @@ const InterviewChat: React.FC = () => {
     setIsLoading(true);
 
     dispatch(submitAnswer({ answer: answerToSubmit, timeUsed }));
+    dispatch(nextQuestion());
 
-    // Check current candidate after submission
-    if (currentCandidate && currentCandidate.answers.length >= 5) {
+    // Check if interview is complete after answer is submitted
+    const updatedQuestionIndex = currentCandidate.currentQuestionIndex + 1;
+    if (updatedQuestionIndex >= 6) {
       await finishInterviewProcess();
     } else {
       const transitionMessage: Message = { id: `transition-${Date.now()}`, type: 'ai', content: 'Answer recorded! Moving to the next question...', timestamp: new Date() };
       setMessages(prev => [...prev, transitionMessage]);
-      dispatch(nextQuestion());
       setIsLoading(false);
     }
   }, [currentQuestion, currentCandidate, timeRemaining, dispatch, finishInterviewProcess]);
