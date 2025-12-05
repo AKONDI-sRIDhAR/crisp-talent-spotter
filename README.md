@@ -47,7 +47,7 @@ You must have Node.js (v18+) and npm installed.
 # Clone the repository 
 git clone https://github.com/AKONDI-sRIDhAR/crisp-talent-spotter
 
-# Navigate into the project directory
+# Navigate
 cd crisp-talent-spotter
 
 # Install dependencies
